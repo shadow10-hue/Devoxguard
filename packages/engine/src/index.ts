@@ -21,3 +21,5 @@ export * from './anomaly/ewma-frequency.analyzer';
 export * from './anomaly/sequence-scan.detector';
 export * from './anomaly/origin-shift.detector';
 export * from './anomaly/composite-scorer';
+export * from './guard/decision-engine';
+export * from './guard/devoxguard.guard';

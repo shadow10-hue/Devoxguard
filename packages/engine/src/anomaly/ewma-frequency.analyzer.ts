@@ -36,8 +36,14 @@ const MIN_INTERVALS_FOR_ZSCORE = 2;
  */
 export class EwmaFrequencyAnalyzer {
   private readonly state = new Map<string, EwmaState>();
+  private readonly lastZScores = new Map<string, number>();
 
   constructor(private readonly config = ANOMALY_CONFIG.ewma) {}
+
+  /** Most recently computed z-score for a (userId, route) key, or 0 if none is available yet (used by composite-scorer.ts). */
+  getLastZScore(userId: string, route: string): number {
+    return this.lastZScores.get(`${userId}:${route}`) ?? 0;
+  }
 
   analyze(entry: BehaviorLogEntry): Finding[] {
     const key = `${entry.userId}:${entry.route}`;
@@ -72,6 +78,10 @@ export class EwmaFrequencyAnalyzer {
       lastTimestamp: entry.timestamp,
       intervalsObserved: previous.intervalsObserved + 1,
     });
+
+    if (zScore !== null) {
+      this.lastZScores.set(key, zScore);
+    }
 
     if (zScore === null || zScore <= this.config.zScoreThreshold) return [];
 

@@ -19,7 +19,8 @@ const SEVERITY_MAP: Record<RawRuleDefinition['severite'], CompiledRule['severite
   haute: 'high',
 };
 
-function referencesResponse(node: ConditionNode): boolean {
+/** Whether a compiled condition reads from the response.* root — used to split rules into request-phase vs response-phase (see guard/devoxguard.guard.ts). */
+export function referencesResponse(node: ConditionNode): boolean {
   switch (node.kind) {
     case 'exists':
       return node.path.segments[0] === 'response';
