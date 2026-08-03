@@ -1,4 +1,4 @@
-import { Collection, MongoClient } from 'mongodb';
+import { Collection, Long, MongoClient } from 'mongodb';
 import { RequestContext } from '../analysis/request-context';
 import { Finding, FINDING_COLLECTION_VALIDATOR } from './finding.schema';
 
@@ -48,7 +48,15 @@ export class MongoFindingRepository {
 
   async insertMany(findings: StoredFinding[]): Promise<void> {
     if (findings.length === 0) return;
-    await this.collection.insertMany(findings);
+    // The $jsonSchema validator requires timestamp as BSON `long`, but a
+    // plain JS number (Date.now()) serializes as BSON `double` by
+    // default — discovered by actually inserting against a live,
+    // schema-validated collection during load testing (mocked unit
+    // tests never exercise real BSON serialization). Convert only at
+    // this persistence boundary so the rest of the codebase keeps using
+    // plain numbers.
+    const documents = findings.map((finding) => ({ ...finding, timestamp: Long.fromNumber(finding.timestamp) }));
+    await this.collection.insertMany(documents as unknown as StoredFinding[]);
   }
 
   async findById(id: string): Promise<StoredFinding | null> {

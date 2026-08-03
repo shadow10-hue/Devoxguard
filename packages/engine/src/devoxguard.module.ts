@@ -2,6 +2,8 @@ import { DynamicModule, Module, Provider } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { Client as ElasticsearchClient } from '@elastic/elasticsearch';
 import { DEVOXGUARD_CONFIG, DevoxGuardConfig } from './devoxguard-config';
+import { RequestAnalysisInterceptor } from './analysis/request-analysis.interceptor';
+import { ResponseAnalysisInterceptor } from './analysis/response-analysis.interceptor';
 import { AnomalyScoreTrendTracker } from './anomaly/anomaly-score-trend.tracker';
 import { EwmaFrequencyAnalyzer } from './anomaly/ewma-frequency.analyzer';
 import { OriginShiftDetector } from './anomaly/origin-shift.detector';
@@ -77,6 +79,23 @@ export class DevoxGuardModule {
       useValue: new TokenBucket(config.tokenBucket.capacity, config.tokenBucket.refillRatePerSec),
     };
 
+    // Registration order matters: Nest runs APP_INTERCEPTOR providers'
+    // pre-handler code in array order and unwinds post-handler code in
+    // reverse, so ResponseAnalysisInterceptor (registered last here)
+    // populates ctx.responseBody before DevoxGuardInterceptor's own
+    // tap() runs, and RequestAnalysisInterceptor (registered first)
+    // has already built the RequestContext before DevoxGuardInterceptor
+    // reads it.
+    const requestAnalysisInterceptorProvider: Provider = {
+      provide: APP_INTERCEPTOR,
+      useClass: RequestAnalysisInterceptor,
+    };
+
+    const responseAnalysisInterceptorProvider: Provider = {
+      provide: APP_INTERCEPTOR,
+      useClass: ResponseAnalysisInterceptor,
+    };
+
     const interceptorProvider: Provider = {
       provide: APP_INTERCEPTOR,
       useFactory: (
@@ -134,7 +153,9 @@ export class DevoxGuardModule {
         decisionEngineProvider,
         trendTrackerProvider,
         tokenBucketProvider,
+        requestAnalysisInterceptorProvider,
         interceptorProvider,
+        responseAnalysisInterceptorProvider,
       ],
       exports: [MongoFindingRepository, RuleRegistry],
     };

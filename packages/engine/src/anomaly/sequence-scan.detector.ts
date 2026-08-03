@@ -62,7 +62,19 @@ export class SequenceScanDetector {
   }
 
   private hasConsecutiveRunWithinWindow(window: WindowEntry[]): boolean {
-    const sorted = [...window].sort((a, b) => a.id - b.id);
+    // Dedupe by id first (keeping the latest timestamp seen for each):
+    // re-requesting the same id multiple times (common under concurrent
+    // load) must not break the consecutive chain — a repeated id has
+    // delta 0 from its neighbor, not the +1 a real run requires.
+    const latestById = new Map<number, number>();
+    for (const entry of window) {
+      const existing = latestById.get(entry.id);
+      if (existing === undefined || entry.timestamp > existing) {
+        latestById.set(entry.id, entry.timestamp);
+      }
+    }
+    const deduped: WindowEntry[] = Array.from(latestById, ([id, timestamp]) => ({ id, timestamp }));
+    const sorted = deduped.sort((a, b) => a.id - b.id);
 
     let runStart = 0;
     for (let i = 1; i <= sorted.length; i += 1) {

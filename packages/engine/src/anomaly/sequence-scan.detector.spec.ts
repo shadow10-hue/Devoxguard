@@ -42,4 +42,19 @@ describe('SequenceScanDetector', () => {
     const findings = run(detector, ['1', '2', '3', '4', '5'], 45_000);
     expect(findings).toHaveLength(0);
   });
+
+  it('regression: duplicate ids interleaved in the window do not break the consecutive run', () => {
+    // Discovered via load testing: concurrent traffic re-requesting the
+    // same ids means the window often contains repeats. A naive
+    // sorted-delta check treats a repeat (delta 0) as breaking the run,
+    // so 5 distinct consecutive ids buried among duplicates never fired.
+    const detector = new SequenceScanDetector();
+    const findings = run(
+      detector,
+      ['10', '11', '10', '12', '11', '13', '12', '14', '13', '14'],
+      3_000,
+    );
+    expect(findings.length).toBeGreaterThan(0);
+    expect(findings[0]).toMatchObject({ type: 'anomaly-sequence', severity: 'high' });
+  });
 });

@@ -3,15 +3,23 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { NextFunction, Request, Response } from 'express';
-import { AppModule } from '../src/app.module';
+import { OrdersModule } from '../src/orders/orders.module';
+import { UsersModule } from '../src/users/users.module';
+import { ReviewsModule } from '../src/reviews/reviews.module';
 import { FakeAuthMiddleware } from '../src/auth/fake-auth.middleware';
 
+// Deliberately imports the raw feature modules, not AppModule: AppModule
+// now wires in DevoxGuardModule (requires a live MongoDB connection at
+// startup and actively blocks these same requests once protected). This
+// suite exists to characterize the app's flaws in isolation, independent
+// of whatever protection is layered on top — see
+// test/devoxguard-protected.e2e-spec.ts for the protected behavior.
 describe('api-demo vulnerable endpoints (e2e)', () => {
   let app: INestApplication<App>;
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+      imports: [OrdersModule, UsersModule, ReviewsModule],
     }).compile();
 
     app = moduleFixture.createNestApplication();

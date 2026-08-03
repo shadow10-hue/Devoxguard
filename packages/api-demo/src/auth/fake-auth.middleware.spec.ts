@@ -18,7 +18,10 @@ describe('FakeAuthMiddleware', () => {
 
     middleware.use(req as never, {} as never, next);
 
-    expect(req.user).toEqual({ id: '1', ownedResourceIds: { orders: ['1', '2'] } });
+    expect(req.user).toEqual({
+      id: '1',
+      ownedResourceIds: { orders: ['1', '2', '10', '11', '12', '13', '14'] },
+    });
     expect(next).toHaveBeenCalledTimes(1);
   });
 

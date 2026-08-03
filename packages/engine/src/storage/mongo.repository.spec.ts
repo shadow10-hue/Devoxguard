@@ -1,4 +1,4 @@
-import { Collection } from 'mongodb';
+import { Collection, Long } from 'mongodb';
 import { MongoFindingRepository, StoredFinding } from './mongo.repository';
 
 function sampleFinding(overrides: Partial<StoredFinding> = {}): StoredFinding {
@@ -61,14 +61,22 @@ describe('MongoFindingRepository', () => {
     expect(collection.insertMany).not.toHaveBeenCalled();
   });
 
-  it('insertMany forwards findings to the collection', async () => {
+  it('insertMany forwards findings to the collection, with timestamp as a BSON Long', async () => {
+    // The $jsonSchema validator requires timestamp as bsonType 'long';
+    // a plain JS number serializes as 'double' by default, which a live
+    // schema-validated collection rejects (caught via load testing).
     const collection = mockCollection([]);
     const repo = new MongoFindingRepository(collection);
     const findings = [sampleFinding()];
 
     await repo.insertMany(findings);
 
-    expect(collection.insertMany).toHaveBeenCalledWith(findings);
+    expect(collection.insertMany).toHaveBeenCalledTimes(1);
+    const insertManyMock = collection.insertMany as unknown as jest.Mock;
+    const [insertedDocs] = insertManyMock.mock.calls[0] as [Array<{ timestamp: Long }>];
+    expect(insertedDocs).toHaveLength(1);
+    expect(Long.isLong(insertedDocs[0].timestamp)).toBe(true);
+    expect(insertedDocs[0].timestamp.toNumber()).toBe(findings[0].timestamp);
   });
 
   it('findById returns the matching finding', async () => {
