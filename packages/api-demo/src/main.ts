@@ -5,6 +5,10 @@ import { FakeAuthMiddleware } from './auth/fake-auth.middleware';
 
 export async function createApp() {
   const app = await NestFactory.create(AppModule);
+  app.enableCors({
+    origin: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-devoxguard-api-key'],
+  });
   const authMiddleware = new FakeAuthMiddleware();
   app.use((req: Request, res: Response, next: NextFunction) => authMiddleware.use(req, res, next));
   return app;

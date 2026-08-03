@@ -13,7 +13,8 @@ import { FakeAuthMiddleware } from '../src/auth/fake-auth.middleware';
 // startup and actively blocks these same requests once protected). This
 // suite exists to characterize the app's flaws in isolation, independent
 // of whatever protection is layered on top — see
-// test/devoxguard-protected.e2e-spec.ts for the protected behavior.
+// test/cors.e2e-spec.ts for a Docker-gated test against the full,
+// protected app.
 describe('api-demo vulnerable endpoints (e2e)', () => {
   let app: INestApplication<App>;
 
