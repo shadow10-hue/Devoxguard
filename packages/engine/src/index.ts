@@ -20,3 +20,4 @@ export * from './anomaly/behavior-log.schema';
 export * from './anomaly/ewma-frequency.analyzer';
 export * from './anomaly/sequence-scan.detector';
 export * from './anomaly/origin-shift.detector';
+export * from './anomaly/composite-scorer';
