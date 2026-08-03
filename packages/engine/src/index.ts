@@ -23,3 +23,4 @@ export * from './anomaly/origin-shift.detector';
 export * from './anomaly/composite-scorer';
 export * from './guard/decision-engine';
 export * from './guard/devoxguard.guard';
+export * from './guard/rate-limiter/token-bucket';
