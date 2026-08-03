@@ -1,0 +1,14 @@
+{
+  "name": "devoxguard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DevoxGuard monorepo: proprietary application-security engine (NestJS) + vulnerable demo API + Vue dashboard",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w packages/engine",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "license": "UNLICENSED"
+}
