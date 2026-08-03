@@ -14,3 +14,4 @@ export * from './rules/dsl/ast';
 export * from './rules/dsl/tokenizer';
 export * from './rules/dsl/parser';
 export * from './rules/dsl/evaluator';
+export * from './rules/rule-evaluator';

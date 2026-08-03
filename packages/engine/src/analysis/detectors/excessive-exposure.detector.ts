@@ -7,10 +7,11 @@ const SENSITIVE_FIELDS = ['passwordHash'];
 
 /**
  * Hardcoded equivalent of the default `excessive-exposure-profile` DSL
- * rule (see rules/default-rules/excessive-exposure-profile.yml,
- * introduced once the DSL exists). Response-phase only: never blocks,
- * only logs, since the handler has already produced the response body
- * by the time this runs.
+ * rule (see rules/default-rules/excessive-exposure-profile.yml). Unlike
+ * idor/mass-assignment, this class is kept active alongside its YAML
+ * twin rather than superseded — see pipeline-parity.spec.ts. Response-
+ * phase only: never blocks, only logs, since the handler has already
+ * produced the response body by the time this runs.
  */
 export class ExcessiveExposureDetector implements Detector {
   readonly name = 'excessive-exposure-profile';

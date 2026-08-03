@@ -7,8 +7,13 @@ const FORBIDDEN_FIELDS = ['role', 'isAdmin'];
 
 /**
  * Hardcoded equivalent of the default `mass-assignment-users` DSL rules
- * (see rules/default-rules/mass-assignment-users.yml, introduced once
- * the DSL exists).
+ * (see rules/default-rules/mass-assignment-users.yml). Superseded by
+ * those rules in the standard pipeline (guard/devoxguard.guard.ts uses
+ * rule-evaluator.ts against the loaded CompiledRule[] instead of this
+ * class); retained as an extensibility example/fallback for
+ * mass-assignment logic too specific to express in the DSL (see
+ * pipeline-parity.spec.ts for the equivalence check between the two
+ * paths).
  */
 export class MassAssignmentDetector implements Detector {
   readonly name = 'mass-assignment-users';
