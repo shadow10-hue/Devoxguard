@@ -8,7 +8,17 @@
   ],
   "scripts": {
     "build": "npm run build -w packages/engine",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present && npm run test:scripts",
+    "test:scripts": "jest -c jest.config.js",
+    "generate-logs": "ts-node scripts/generate-logs.ts"
   },
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^26.1.2",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.12",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  }
 }

@@ -15,3 +15,6 @@ export * from './rules/dsl/tokenizer';
 export * from './rules/dsl/parser';
 export * from './rules/dsl/evaluator';
 export * from './rules/rule-evaluator';
+export * from './anomaly/anomaly.config';
+export * from './anomaly/behavior-log.schema';
+export * from './anomaly/ewma-frequency.analyzer';
