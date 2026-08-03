@@ -26,6 +26,11 @@ export interface FindingsPage {
   pageSize: number;
 }
 
+export interface RuleTriggerCount {
+  ruleName: string;
+  count: number;
+}
+
 const DEFAULT_PAGE_SIZE = 20;
 
 /**
@@ -76,6 +81,25 @@ export class MongoFindingRepository {
     ]);
 
     return { items, total, page, pageSize };
+  }
+
+  /** Count of findings with actionTaken 'blocked' since the given timestamp — backs stats/overview's blockedLast24h. */
+  async countBlockedSince(sinceTimestamp: number): Promise<number> {
+    return this.collection.countDocuments({ actionTaken: 'blocked', timestamp: { $gte: sinceTimestamp } });
+  }
+
+  /** Top `limit` DSL rules by trigger count — backs stats/overview's topRulesTriggered. */
+  async topRulesTriggered(limit = 5): Promise<RuleTriggerCount[]> {
+    const results = await this.collection
+      .aggregate<{ _id: string; count: number }>([
+        { $match: { ruleName: { $exists: true, $ne: null } } },
+        { $group: { _id: '$ruleName', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: limit },
+      ])
+      .toArray();
+
+    return results.map((r) => ({ ruleName: r._id, count: r.count }));
   }
 }
 

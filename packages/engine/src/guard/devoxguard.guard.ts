@@ -35,6 +35,8 @@ export interface DevoxGuardDeps {
   decisionEngine: DecisionEngine;
   rateLimiter?: RateLimiter;
   persistFindings?: (findings: Finding[], context: RequestContext) => Promise<void> | void;
+  /** Sampled with every computed composite score, for the dashboard's stats/overview trend (see anomaly-score-trend.tracker.ts). */
+  scoreTrendTracker?: { record(timestamp: number, score: number): void };
 }
 
 interface PreDecision {
@@ -121,6 +123,8 @@ export class DevoxGuardInterceptor implements NestInterceptor {
         sequenceDetected: seqFindings.length > 0,
         originShiftDetected: originFindings.length > 0,
       });
+
+      this.deps.scoreTrendTracker?.record(ctx.timestamp, compositeScore);
     }
 
     const findings = [...ruleFindings, ...anomalyFindings];

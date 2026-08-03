@@ -25,6 +25,8 @@ function mockCollection(items: StoredFinding[]) {
     toArray: jest.fn().mockResolvedValue(items),
   };
 
+  const aggregateCursor = { toArray: jest.fn().mockResolvedValue([]) };
+
   return {
     createIndex: jest.fn().mockResolvedValue(undefined),
     insertMany: jest.fn().mockResolvedValue(undefined),
@@ -33,8 +35,10 @@ function mockCollection(items: StoredFinding[]) {
     }),
     find: jest.fn().mockReturnValue(cursor),
     countDocuments: jest.fn().mockResolvedValue(items.length),
+    aggregate: jest.fn().mockReturnValue(aggregateCursor),
     cursor,
-  } as unknown as Collection<StoredFinding> & { cursor: typeof cursor };
+    aggregateCursor,
+  } as unknown as Collection<StoredFinding> & { cursor: typeof cursor; aggregateCursor: typeof aggregateCursor };
 }
 
 describe('MongoFindingRepository', () => {
@@ -99,5 +103,30 @@ describe('MongoFindingRepository', () => {
     expect(collection.find).toHaveBeenCalledWith({ timestamp: { $gte: 100, $lte: 200 } });
     expect(collection.cursor.skip).toHaveBeenCalledWith(5);
     expect(collection.cursor.limit).toHaveBeenCalledWith(5);
+  });
+
+  it('countBlockedSince filters by actionTaken blocked and a minimum timestamp', async () => {
+    const collection = mockCollection([]);
+    const repo = new MongoFindingRepository(collection);
+
+    await repo.countBlockedSince(1000);
+
+    expect(collection.countDocuments).toHaveBeenCalledWith({ actionTaken: 'blocked', timestamp: { $gte: 1000 } });
+  });
+
+  it('topRulesTriggered aggregates and maps _id to ruleName', async () => {
+    const collection = mockCollection([]);
+    collection.aggregateCursor.toArray.mockResolvedValueOnce([
+      { _id: 'idor-orders', count: 5 },
+      { _id: 'mass-assignment-users-role', count: 2 },
+    ]);
+    const repo = new MongoFindingRepository(collection);
+
+    const result = await repo.topRulesTriggered(5);
+
+    expect(result).toEqual([
+      { ruleName: 'idor-orders', count: 5 },
+      { ruleName: 'mass-assignment-users-role', count: 2 },
+    ]);
   });
 });
