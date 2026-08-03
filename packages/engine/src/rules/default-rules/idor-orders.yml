@@ -1,0 +1,6 @@
+- nom: "idor-orders"
+  route: "/orders/:id"
+  methode: GET
+  condition: "params.id not in user.ownedResourceIds.orders"
+  action: bloquer
+  severite: haute

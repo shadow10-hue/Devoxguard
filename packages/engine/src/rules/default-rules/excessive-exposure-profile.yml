@@ -1,0 +1,6 @@
+- nom: "excessive-exposure-passwordHash"
+  route: "/users/:id/profile"
+  methode: GET
+  condition: "response.passwordHash exists"
+  action: journaliser
+  severite: moyenne

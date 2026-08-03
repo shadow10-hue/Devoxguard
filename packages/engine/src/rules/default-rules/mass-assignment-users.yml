@@ -1,0 +1,13 @@
+- nom: "mass-assignment-users-role"
+  route: "/users/:id"
+  methode: PATCH
+  condition: "body.role exists"
+  action: bloquer
+  severite: haute
+
+- nom: "mass-assignment-users-isAdmin"
+  route: "/users/:id"
+  methode: PATCH
+  condition: "body.isAdmin exists"
+  action: bloquer
+  severite: haute
