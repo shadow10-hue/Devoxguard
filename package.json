@@ -6,6 +6,9 @@
   "workspaces": [
     "packages/*"
   ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "npm run build -w packages/engine",
     "test": "npm run test --workspaces --if-present && npm run test:scripts",

@@ -1,0 +1,12 @@
+# Default owner for everything in the repo.
+* @shadow10-hue
+
+# Security-sensitive paths: changes here alter the security posture or the
+# pipeline's gates and always need the owner's review.
+/.github/ @shadow10-hue
+/.gitleaks.toml @shadow10-hue
+/.semgrepignore @shadow10-hue
+/.trivyignore @shadow10-hue
+/.zap/ @shadow10-hue
+/packages/engine/src/guard/ @shadow10-hue
+/packages/engine/src/rules/ @shadow10-hue

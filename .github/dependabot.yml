@@ -1,0 +1,39 @@
+version: 2
+updates:
+  # npm workspaces monorepo: one root lockfile covers all packages.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - ci
+
+  # Dockerfiles (api-demo, dashboard) and docker-compose base images.
+  - package-ecosystem: docker
+    directories:
+      - /packages/api-demo
+      - /packages/dashboard
+      - /
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - docker

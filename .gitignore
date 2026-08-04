@@ -2,8 +2,17 @@ node_modules/
 dist/
 coverage/
 .env
+.env.*
+!.env.example
 *.log
 .DS_Store
+
+# Local tool exports that may contain connection strings / credentials
+compass-connections.json
+
+# Scanner outputs
+*.sarif
+zap-report*
 
 # Internal spec docs — not for the public repo
 DevoxGuard_Spec_ClaudeCode.md
