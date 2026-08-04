@@ -4,3 +4,7 @@ coverage/
 .env
 *.log
 .DS_Store
+
+# Internal spec docs — not for the public repo
+DevoxGuard_Spec_ClaudeCode.md
+DevoxGuard_Spec_ClaudeCode_v2.md
