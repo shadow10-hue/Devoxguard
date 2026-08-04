@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { ChevronLeft, ChevronRight } from '@lucide/vue';
 import { devoxguardClient, type Finding } from '../api/devoxguard-client';
+import SeverityBadge from '../components/SeverityBadge.vue';
+import ActionBadge from '../components/ActionBadge.vue';
+import LoadingSkeleton from '../components/LoadingSkeleton.vue';
+import ErrorState from '../components/ErrorState.vue';
+import EmptyState from '../components/EmptyState.vue';
 
 const router = useRouter();
 
@@ -61,38 +67,51 @@ onMounted(load);
     <h1>Findings</h1>
 
     <div class="filters">
-      <input v-model="typeFilter" placeholder="type" aria-label="filter by type" />
-      <input v-model="severityFilter" placeholder="severity" aria-label="filter by severity" />
-      <input v-model="routeFilter" placeholder="route" aria-label="filter by route" />
+      <input v-model="typeFilter" placeholder="Filter by type…" aria-label="filter by type" />
+      <select v-model="severityFilter" aria-label="filter by severity">
+        <option value="">All severities</option>
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+      </select>
+      <input v-model="routeFilter" placeholder="Filter by route…" aria-label="filter by route" />
     </div>
 
-    <p v-if="loading">Loading…</p>
-    <p v-else-if="error" class="error">{{ error }}</p>
-    <table v-else>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Severity</th>
-          <th>Route</th>
-          <th>Action</th>
-          <th>Timestamp</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="finding in items" :key="finding.id" class="row" @click="goToDetail(finding.id)">
-          <td>{{ finding.type }}</td>
-          <td>{{ finding.severity }}</td>
-          <td>{{ finding.route }}</td>
-          <td>{{ finding.actionTaken }}</td>
-          <td>{{ new Date(finding.timestamp).toLocaleString() }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <LoadingSkeleton v-if="loading" variant="table" :rows="pageSize > 10 ? 10 : pageSize" />
+    <ErrorState v-else-if="error" :message="error" />
+    <EmptyState v-else-if="items.length === 0" title="No findings match these filters" />
+
+    <div v-else class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Severity</th>
+            <th>Route</th>
+            <th>Action</th>
+            <th>Timestamp</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="finding in items" :key="finding.id" class="row" @click="goToDetail(finding.id)">
+            <td>{{ finding.type }}</td>
+            <td><SeverityBadge :severity="finding.severity" /></td>
+            <td><code>{{ finding.route }}</code></td>
+            <td><ActionBadge :action="finding.actionTaken" /></td>
+            <td class="timestamp">{{ new Date(finding.timestamp).toLocaleString() }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <div class="pagination">
-      <button :disabled="page <= 1" @click="prevPage">Previous</button>
-      <span>Page {{ page }} ({{ total }} total)</span>
-      <button :disabled="page * pageSize >= total" @click="nextPage">Next</button>
+      <button class="page-btn" :disabled="page <= 1" @click="prevPage">
+        <ChevronLeft :size="16" /> Previous
+      </button>
+      <span class="page-info">Page {{ page }} ({{ total }} total)</span>
+      <button class="page-btn" :disabled="page * pageSize >= total" @click="nextPage">
+        Next <ChevronRight :size="16" />
+      </button>
     </div>
   </section>
 </template>
@@ -100,32 +119,91 @@ onMounted(load);
 <style scoped>
 .filters {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.filters input,
+.filters select {
+  font: inherit;
+  font-size: 14px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-h);
+}
+.filters input:focus,
+.filters select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.card {
+  padding: 0;
+  overflow-x: auto;
 }
 table {
   width: 100%;
   border-collapse: collapse;
 }
-th,
+th {
+  text-align: left;
+  padding: var(--space-3) var(--space-4);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
 td {
   text-align: left;
-  padding: 0.4rem 0.6rem;
-  border-bottom: 1px solid #3333;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+tbody tr:last-child td {
+  border-bottom: none;
+}
+.timestamp {
+  color: var(--text);
+  white-space: nowrap;
 }
 .row {
   cursor: pointer;
+  transition: background-color 0.15s ease;
 }
 .row:hover {
-  background: #8882;
+  background: var(--surface-hover);
 }
 .pagination {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--space-3);
   align-items: center;
-  margin-top: 1rem;
+  margin-top: var(--space-4);
 }
-.error {
-  color: #c0392b;
+.page-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-h);
+  cursor: pointer;
+}
+.page-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.page-info {
+  font-size: 13px;
+  color: var(--text);
 }
 </style>

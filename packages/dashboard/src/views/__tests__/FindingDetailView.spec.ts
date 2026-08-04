@@ -11,7 +11,10 @@ vi.mock('../../api/devoxguard-client', () => ({
 function makeRouter() {
   return createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/findings/:id', name: 'finding-detail', component: FindingDetailView }],
+    routes: [
+      { path: '/findings', name: 'findings', component: { template: '<div />' } },
+      { path: '/findings/:id', name: 'finding-detail', component: FindingDetailView },
+    ],
   });
 }
 
@@ -51,7 +54,11 @@ describe('FindingDetailView', () => {
 
     expect(devoxguardClient.getFinding).toHaveBeenCalledWith('f-1');
     expect(wrapper.text()).toContain('Requested order id not owned by caller');
-    expect(wrapper.text()).toContain('"originIp": "10.0.0.1"');
+    // Request context is now rendered as a structured key/value tree
+    // (KeyValueTree.vue) instead of a raw JSON.stringify dump, so this
+    // asserts the humanized label + value rather than JSON punctuation.
+    expect(wrapper.text()).toContain('Origin Ip');
+    expect(wrapper.text()).toContain('10.0.0.1');
   });
 
   it('shows an error message when the request fails', async () => {
