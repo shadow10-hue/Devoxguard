@@ -40,6 +40,13 @@ describe('CORS (e2e)', () => {
 
   beforeAll(async () => {
     mongoAvailable = await isMongoAvailable();
+    if (!mongoAvailable && process.env.DEVOX_REQUIRE_SERVICES === '1') {
+      // CI sets DEVOX_REQUIRE_SERVICES=1: an unreachable MongoDB must fail
+      // the build, not silently skip the suite.
+      throw new Error(
+        '[cors.e2e-spec] DEVOX_REQUIRE_SERVICES=1 but MongoDB is unreachable.',
+      );
+    }
     if (!mongoAvailable) {
       console.warn(
         '[cors.e2e-spec] MongoDB not reachable on localhost — skipping. ' +

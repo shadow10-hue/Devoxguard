@@ -36,6 +36,13 @@ describe('storage integration (MongoDB + Elasticsearch)', () => {
 
   beforeAll(async () => {
     servicesAvailable = await checkServicesAvailable();
+    if (!servicesAvailable && process.env.DEVOX_REQUIRE_SERVICES === '1') {
+      // CI sets DEVOX_REQUIRE_SERVICES=1: unreachable services must fail
+      // the build, not silently skip the suite.
+      throw new Error(
+        '[storage.integration.spec] DEVOX_REQUIRE_SERVICES=1 but MongoDB/Elasticsearch are unreachable.',
+      );
+    }
     if (!servicesAvailable) {
       console.warn(
         '[storage.integration.spec] MongoDB/Elasticsearch not reachable on localhost — skipping. ' +

@@ -1,0 +1,14 @@
+# OSV-Scanner suppression register.
+# Policy: every entry needs a reason, a scope note (prod vs dev), and a
+# review date. Remove entries as soon as an upstream fix ships.
+# See .github/SECURITY.md — suppressions must stay auditable.
+
+[[IgnoredVulns]]
+id = "GHSA-w5hq-g745-h8pq"
+# uuid < 11.1.1: missing buffer bounds check in v3/v5/v6 when `buf` is
+# provided. Only reachable via autocannon -> hyperid -> uuid@3, a
+# devDependency used exclusively by the local load-test script; the
+# vulnerable code path (buf argument) is never exercised. autocannon 8.0.0
+# is the latest release and still pins hyperid — no upstream fix available.
+# Direct uuid dependency in packages/engine was upgraded to ^11.1.1.
+reason = "Dev-only transitive (autocannon->hyperid), vulnerable API not used, no upstream fix. Review 2026-11-01."
