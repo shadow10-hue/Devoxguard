@@ -50,7 +50,7 @@ be traceable:
 |---|---|---|
 | Semgrep | inline `// nosemgrep: <rule-id>` + justification comment | one per finding, never per-directory |
 | CodeQL | inline `// codeql[<query-id>]` alert suppression | same |
-| Gitleaks | `.gitleaks.toml` allowlist | exact literal + path scoped, commented |
+| Gitleaks | `.gitleaks.toml` allowlist; `.gitleaksignore` for historical commits | exact literal + path scoped, commented; fingerprints justified |
 | Trivy | `.trivyignore` | CVE id + reason + review date |
 | ZAP | `.zap/rules.tsv` | rule id + comment naming the accepted risk |
 

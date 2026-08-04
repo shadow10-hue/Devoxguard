@@ -1,0 +1,7 @@
+# Per-finding gitleaks suppressions by fingerprint
+# (commit:file:rule:line). Each entry needs a justification.
+
+# Stock NestJS README boilerplate from `nest new`: a fake example token in
+# the upstream CircleCI badge URL (nestjs/nest repo, not ours). Removed from
+# the working tree; this fingerprint covers the historical commit.
+2dc5b5aff4c0682a82aac1f269cb0c95075901f5:packages/api-demo/README.md:generic-api-key:5

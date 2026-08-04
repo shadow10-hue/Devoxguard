@@ -1,0 +1,23 @@
+# Gitleaks configuration — extends the default ruleset.
+# Policy: allowlist entries must be exact literals scoped as tightly as
+# possible, each mapped to a row in .github/SECURITY.md's accepted-risk
+# register. Never allowlist a pattern broader than the known value.
+
+[extend]
+useDefault = true
+
+# AR-5: the documented development fallback API key. It is not a real
+# credential; production deployments must set DEVOXGUARD_API_KEY.
+# Known locations: packages/api-demo/src/app.module.ts,
+# packages/api-demo/scripts/load-test.ts,
+# packages/api-demo/test/cors.e2e-spec.ts, CONTRIBUTING.md.
+[[allowlists]]
+description = "AR-5: documented dev fallback key 'dev-api-key' (not a credential)"
+regexes = ['''dev-api-key''']
+
+# AR-3: seed data ships fake password hashes for the deliberately
+# vulnerable demo (values like 'hash-alice-9f8a' — not real hashes).
+[[allowlists]]
+description = "AR-3: fake passwordHash literals in demo seed data"
+paths = ['''packages/api-demo/src/seed/seed-data\.ts''']
+regexes = ['''hash-[a-z]+-[0-9a-f]{4}''']

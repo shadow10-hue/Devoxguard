@@ -1,0 +1,8 @@
+# Semgrep scan exclusions — build artifacts and dependencies only.
+# Source directories are NEVER excluded here; intentional findings get
+# inline `nosemgrep` comments with per-finding justifications instead
+# (see .github/SECURITY.md accepted-risk register).
+node_modules/
+dist/
+coverage/
+.git/
