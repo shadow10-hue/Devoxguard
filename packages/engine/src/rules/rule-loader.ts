@@ -100,7 +100,6 @@ export class RuleLoader {
         try {
           onChange(this.loadFromDirectory(dirPath));
         } catch (err) {
-          // eslint-disable-next-line no-console
           console.error('[DevoxGuard] Failed to hot-reload rules:', err);
         }
       }, 50);

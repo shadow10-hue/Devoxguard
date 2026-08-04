@@ -24,7 +24,9 @@ describe('UsersService', () => {
   });
 
   it('getProfile throws NotFoundException for an unknown id', () => {
-    expect(() => service.getProfile('does-not-exist')).toThrow(NotFoundException);
+    expect(() => service.getProfile('does-not-exist')).toThrow(
+      NotFoundException,
+    );
   });
 
   it('update merges arbitrary fields including role/isAdmin (deliberate mass assignment)', () => {
@@ -33,6 +35,8 @@ describe('UsersService', () => {
   });
 
   it('update throws NotFoundException for an unknown id', () => {
-    expect(() => service.update('does-not-exist', { role: 'admin' })).toThrow(NotFoundException);
+    expect(() => service.update('does-not-exist', { role: 'admin' })).toThrow(
+      NotFoundException,
+    );
   });
 });

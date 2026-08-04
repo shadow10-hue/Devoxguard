@@ -10,7 +10,12 @@ describe('ReviewsService', () => {
     const service = new ReviewsService();
     const before = service.list().length;
 
-    const created = service.create({ orderId: '2', userId: '1', rating: 4, comment: 'Good' });
+    const created = service.create({
+      orderId: '2',
+      userId: '1',
+      rating: 4,
+      comment: 'Good',
+    });
 
     expect(created.id).toBeDefined();
     expect(service.list().length).toBe(before + 1);

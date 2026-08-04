@@ -10,7 +10,9 @@ export async function createApp() {
     allowedHeaders: ['Content-Type', 'Authorization', 'x-devoxguard-api-key'],
   });
   const authMiddleware = new FakeAuthMiddleware();
-  app.use((req: Request, res: Response, next: NextFunction) => authMiddleware.use(req, res, next));
+  app.use((req: Request, res: Response, next: NextFunction) =>
+    authMiddleware.use(req, res, next),
+  );
   return app;
 }
 

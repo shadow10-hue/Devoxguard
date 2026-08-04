@@ -37,7 +37,6 @@ describe('storage integration (MongoDB + Elasticsearch)', () => {
   beforeAll(async () => {
     servicesAvailable = await checkServicesAvailable();
     if (!servicesAvailable) {
-      // eslint-disable-next-line no-console
       console.warn(
         '[storage.integration.spec] MongoDB/Elasticsearch not reachable on localhost — skipping. ' +
           'Run `docker compose -f docker-compose.dev.yml up -d` to exercise this test.',

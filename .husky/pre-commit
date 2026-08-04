@@ -1,0 +1,11 @@
+# Lint + format the staged files (fails the commit on unfixable errors).
+npx lint-staged
+
+# Staged secret scan — best-effort locally: Gitleaks is a standalone binary
+# that may not be installed on every dev machine. CI runs the authoritative
+# full-history scan either way.
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact
+else
+  echo "[pre-commit] gitleaks not installed locally; skipping staged secret scan (CI enforces it)."
+fi

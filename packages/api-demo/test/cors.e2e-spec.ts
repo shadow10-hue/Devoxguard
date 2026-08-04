@@ -21,7 +21,9 @@ const DASHBOARD_ORIGIN = 'http://localhost:5173';
 
 async function isMongoAvailable(): Promise<boolean> {
   try {
-    const client = new MongoClient(MONGO_URI, { serverSelectionTimeoutMS: 1500 });
+    const client = new MongoClient(MONGO_URI, {
+      serverSelectionTimeoutMS: 1500,
+    });
     await client.connect();
     await client.db('devoxguard').command({ ping: 1 });
     await client.close();
@@ -39,7 +41,6 @@ describe('CORS (e2e)', () => {
   beforeAll(async () => {
     mongoAvailable = await isMongoAvailable();
     if (!mongoAvailable) {
-      // eslint-disable-next-line no-console
       console.warn(
         '[cors.e2e-spec] MongoDB not reachable on localhost — skipping. ' +
           'Run `docker compose -f docker-compose.dev.yml up -d` to exercise this test.',

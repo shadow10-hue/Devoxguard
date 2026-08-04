@@ -25,7 +25,9 @@ describe('api-demo vulnerable endpoints (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     const authMiddleware = new FakeAuthMiddleware();
-    app.use((req: Request, res: Response, next: NextFunction) => authMiddleware.use(req, res, next));
+    app.use((req: Request, res: Response, next: NextFunction) =>
+      authMiddleware.use(req, res, next),
+    );
     await app.init();
   });
 

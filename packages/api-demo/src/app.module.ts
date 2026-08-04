@@ -13,9 +13,15 @@ import { UsersModule } from './users/users.module';
     DevoxGuardModule.forRoot({
       mongoUri: process.env.DEVOXGUARD_MONGO_URI ?? 'mongodb://localhost:27017',
       mongoDbName: process.env.DEVOXGUARD_MONGO_DB ?? 'devoxguard',
-      elasticsearchNode: process.env.DEVOXGUARD_ES_NODE ?? 'http://localhost:9200',
+      elasticsearchNode:
+        process.env.DEVOXGUARD_ES_NODE ?? 'http://localhost:9200',
       apiKey: process.env.DEVOXGUARD_API_KEY ?? 'dev-api-key',
-      rulesDirectory: path.join(require.resolve('@devox/engine'), '..', 'rules', 'default-rules'),
+      rulesDirectory: path.join(
+        require.resolve('@devox/engine'),
+        '..',
+        'rules',
+        'default-rules',
+      ),
       tokenBucket: { capacity: 20, refillRatePerSec: 2 },
     }),
   ],

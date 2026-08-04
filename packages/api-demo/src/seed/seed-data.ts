@@ -22,8 +22,20 @@ export interface SeedReview {
 }
 
 export const USERS: SeedUser[] = [
-  { id: '1', name: 'Alice', role: 'user', isAdmin: false, passwordHash: 'hash-alice-9f8a' },
-  { id: '2', name: 'Bob', role: 'user', isAdmin: false, passwordHash: 'hash-bob-3c21' },
+  {
+    id: '1',
+    name: 'Alice',
+    role: 'user',
+    isAdmin: false,
+    passwordHash: 'hash-alice-9f8a',
+  },
+  {
+    id: '2',
+    name: 'Bob',
+    role: 'user',
+    isAdmin: false,
+    passwordHash: 'hash-bob-3c21',
+  },
 ];
 
 export const ORDERS: SeedOrder[] = [
@@ -46,5 +58,7 @@ export const REVIEWS: SeedReview[] = [
 ];
 
 export function ownedOrderIds(userId: string): string[] {
-  return ORDERS.filter((order) => order.userId === userId).map((order) => order.id);
+  return ORDERS.filter((order) => order.userId === userId).map(
+    (order) => order.id,
+  );
 }
