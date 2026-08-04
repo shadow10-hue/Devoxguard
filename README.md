@@ -12,6 +12,8 @@ See `docs/architecture.md`, `docs/dsl-spec.md`, and `docs/anomaly-engine.md` for
 
 ## Getting started
 
+New to this project? **[CONTRIBUTING.md](./CONTRIBUTING.md)** walks through setup step by step with a checkpoint after each one, plus a troubleshooting section for the issues actually hit while building this. Quick version:
+
 ```bash
 npm install                                    # installs all workspaces
 docker compose -f docker-compose.dev.yml up -d # MongoDB (27017) + Elasticsearch (9200)
