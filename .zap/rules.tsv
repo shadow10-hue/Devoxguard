@@ -1,0 +1,1 @@
+10049	IGNORE	(Content Cacheability: API deliberately serves Cache-Control: no-store — findings/user data must never be cached; the rule also warns on non-storable content, which is the intended state)

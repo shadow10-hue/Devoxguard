@@ -5,6 +5,14 @@ import { FakeAuthMiddleware } from './auth/fake-auth.middleware';
 
 export async function createApp() {
   const app = await NestFactory.create(AppModule);
+  // Don't advertise the framework (ZAP 10037), and keep API responses out
+  // of shared caches — they carry per-user and security-finding data
+  // (ZAP 10049).
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    res.removeHeader('X-Powered-By');
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+  });
   app.enableCors({
     origin: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'x-devoxguard-api-key'],
