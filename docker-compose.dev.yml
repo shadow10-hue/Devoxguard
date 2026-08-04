@@ -1,6 +1,7 @@
 services:
   mongo:
-    image: mongo:7
+    # Tag kept for readability; digest is the actual pin (tags are mutable).
+    image: mongo:7@sha256:35a5926f71f8b6cb19206bee928c5a85f241a8be99f20c81abe35ae78a73415d
     container_name: devoxguard-mongo
     ports:
       - "27017:27017"
@@ -13,7 +14,8 @@ services:
       retries: 5
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    # Dev-only single node; xpack security stays off for local convenience.
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0@sha256:84a73ced8390c059e7bc2858595c68dc36e6f8bdb98895dcab0074eda35ac96e
     container_name: devoxguard-elasticsearch
     environment:
       - discovery.type=single-node

@@ -1,0 +1,10 @@
+# Trivy suppression register — currently empty.
+#
+# Format (one per line):
+#   CVE-YYYY-NNNNN
+# preceded by a comment stating:
+#   - why it is accepted (false positive / not reachable / accepted risk)
+#   - scope (which image/layer)
+#   - review date
+# Every entry must map to a row in .github/SECURITY.md's accepted-risk
+# register or reference a tracking issue.

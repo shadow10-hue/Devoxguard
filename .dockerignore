@@ -1,0 +1,15 @@
+.git
+.github
+.husky
+.claude
+node_modules
+**/node_modules
+**/dist
+**/coverage
+docs
+*.md
+*.log
+.env
+.env.*
+compass-connections.json
+*.sarif
