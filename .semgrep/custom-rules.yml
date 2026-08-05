@@ -1,0 +1,32 @@
+# Supplementary rules for gaps found in the free Semgrep registry packs
+# (p/typescript, p/owasp-top-ten): bare eval()/Function() are dynamic-code-
+# execution sinks that neither pack flags for TS/JS without a paid Semgrep
+# account. Verified via the fail-closed gate proof (2026-08) — see
+# docs/devsecops.md.
+rules:
+  - id: local-eval-detected
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      eval() executes a string as code. If any part of the argument is
+      influenced by user input this is a code-injection vulnerability.
+      Avoid eval(); use JSON.parse for data or a proper parser/interpreter
+      for expressions (see packages/engine/src/rules/dsl for this repo's
+      own hand-rolled alternative).
+    metadata:
+      cwe: 'CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code'
+      owasp: 'A03:2021 - Injection'
+    patterns:
+      - pattern: eval(...)
+
+  - id: local-function-constructor-detected
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      The Function() constructor compiles a string as code, the same risk
+      class as eval(). Avoid it for anything derived from user input.
+    metadata:
+      cwe: 'CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code'
+      owasp: 'A03:2021 - Injection'
+    patterns:
+      - pattern: new Function(...)

@@ -102,5 +102,28 @@ On a throwaway branch, each of these must turn the corresponding job red:
 
 1. Commit a fake AWS key (e.g. `AKIA` + 16 uppercase chars) → `secrets` fails.
 2. Add `eval(req.query.q)` to a controller → `semgrep` / CodeQL fails.
-3. Downgrade a dependency to a version with a known CVE → `sca` fails.
+3. Downgrade a dependency to a version with a known CVE → `sca` / `osv-scan` fails.
 4. Stop the Mongo service container → `build-test` fails (not skips).
+
+This was actually run (2026-08-05, branch `test/fail-closed-proof`, deleted
+after verification). Findings:
+
+- **secrets** and **osv-scan** failed exactly as expected on the injected
+  fake AWS key and a reverted vitest version with known critical/high CVEs.
+- **semgrep passed when it should have failed.** `p/typescript` +
+  `p/owasp-top-ten` — and, on further testing, `p/javascript`,
+  `p/security-audit`, and `p/nodejsscan` too — do not flag a bare `eval()`
+  call for unauthenticated/free Semgrep; that rule lives behind a paid
+  Semgrep account, which conflicts with the free-tooling requirement. Fixed
+  by adding [`​.semgrep/custom-rules.yml`](../.semgrep/custom-rules.yml)
+  (eval/Function-constructor detection) to the semgrep step. Re-verified:
+  the same throwaway branch then failed `semgrep` as expected, with zero
+  false positives against the rest of the repo.
+- **sca** (`npm audit --omit=dev`) correctly did *not* fail on the
+  vitest downgrade, since it's a devDependency — that's by design, not a
+  gap; `osv-scan` is the gate that covers devDependencies.
+
+Lesson: free-tier SAST registries have real coverage gaps for specific sink
+patterns (bare `eval`, likely others). Don't assume a named ruleset implies
+coverage — verify with an actual injected finding, and expect to supplement
+with small custom rules for gaps that matter to this codebase.
