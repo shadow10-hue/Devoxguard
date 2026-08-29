@@ -1,0 +1,54 @@
+# Prometheus alerting rules for DevoxGuard.
+#
+# DevoxGuard exposes Prometheus metrics at GET /devoxguard/metrics (protected by
+# the internal API key — scrape it through the dashboard's nginx, which injects
+# the key, or give Prometheus the key via an `authorization`/header config).
+#
+# The signal these rules watch is `devoxguard_findings_total{actionTaken=...}`,
+# a counter incremented once per finding in the guard's persist() step. Load
+# this file into Prometheus via `rule_files:` and point Alertmanager at the same
+# webhook the engine's AlertNotifier uses, or a separate one.
+groups:
+  - name: devoxguard.attacks
+    rules:
+      # A burst of blocks usually means an active attack (or a bad deploy
+      # tripping a detector). Pairs with the engine's own per-request webhook
+      # alert — this one catches sustained volume rather than single events.
+      - alert: DevoxGuardHighBlockRate
+        expr: sum(rate(devoxguard_findings_total{actionTaken="blocked"}[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: DevoxGuard is blocking requests at an elevated rate
+          description: >
+            More than 1 blocked finding/sec (5m avg) for 5 minutes. Check the
+            dashboard Findings tab and the incident-response runbook
+            (docs/incident-response.md).
+
+      - alert: DevoxGuardBlockSpike
+        expr: sum(increase(devoxguard_findings_total{actionTaken="blocked"}[10m])) > 100
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: DevoxGuard block spike (>100 in 10m)
+          description: >
+            Over 100 requests blocked in 10 minutes — likely a targeted
+            injection/scan campaign. Follow docs/incident-response.md
+            (triage → containment).
+
+  - name: devoxguard.availability
+    rules:
+      # `up` is the scrape-health metric Prometheus synthesizes per target.
+      - alert: DevoxGuardMetricsDown
+        expr: up{job="devoxguard"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: DevoxGuard metrics endpoint is unreachable
+          description: >
+            Prometheus cannot scrape /devoxguard/metrics for 5 minutes. The
+            engine may be down (fail-closed on Mongo) or the API key/proxy is
+            misconfigured.

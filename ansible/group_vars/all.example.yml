@@ -1,0 +1,27 @@
+# Copy to group_vars/all.yml and fill in. Encrypt the secrets before committing:
+#   ansible-vault encrypt group_vars/all.yml
+# (or keep this file plaintext and inline-vault only the secret values).
+deploy_user: deploy
+deploy_dir: /opt/devoxguard
+
+# Digest-pin these for production (…@sha256:…). CD passes them via -e instead.
+api_image: "ghcr.io/shadow10-hue/devoxguard-api-demo:latest"
+dash_image: "ghcr.io/shadow10-hue/devoxguard-dashboard:latest"
+
+# Caddy TLS edge — must be a real domain resolving to the VM, and a contactable
+# email for Let's Encrypt.
+devoxguard_domain: devoxguard.example.com
+devoxguard_acme_email: you@example.com
+
+# Enable IP auto-containment in production (docs/incident-response.md).
+devoxguard_auto_contain: "true"
+# devoxguard_alert_webhook: "https://hooks.slack.com/services/…"
+
+# SECRET — vault this value. Generate with: openssl rand -hex 32
+devoxguard_api_key: "REPLACE_WITH_openssl_rand_hex_32"
+
+# Edge basic-auth protecting the dashboard + internal API (caddy/Caddyfile).
+# The hash is a SECRET — vault it. Generate with:
+#   docker run --rm caddy:2-alpine caddy hash-password --plaintext 'your-strong-password'
+devoxguard_dashboard_auth_user: "admin"
+devoxguard_dashboard_auth_hash: "REPLACE_WITH_caddy_hash_password_output"

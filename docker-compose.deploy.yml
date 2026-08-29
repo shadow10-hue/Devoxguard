@@ -1,0 +1,22 @@
+# Pull-based deployment overlay. Layer it on top of docker-compose.prod.yml to
+# run the SIGNED, published GHCR images instead of building from source on the
+# VM:
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.deploy.yml up -d
+#
+# `build: !reset null` drops the base file's build section so compose pulls the
+# image rather than building it. Set API_IMAGE / DASH_IMAGE to digest-pinned
+# refs (ghcr.io/<owner>/devoxguard-api-demo@sha256:…) for immutable, verifiable
+# deploys — the CD workflow (.github/workflows/cd.yml) does exactly this after
+# verifying each image's Cosign signature. The :latest defaults below are a
+# convenience for manual pulls only; production should always pin a digest.
+services:
+  api-demo:
+    build: !reset null
+    image: ${API_IMAGE:-ghcr.io/shadow10-hue/devoxguard-api-demo:latest}
+    pull_policy: always
+
+  dashboard:
+    build: !reset null
+    image: ${DASH_IMAGE:-ghcr.io/shadow10-hue/devoxguard-dashboard:latest}
+    pull_policy: always

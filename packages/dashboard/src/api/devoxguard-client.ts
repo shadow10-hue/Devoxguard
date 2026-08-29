@@ -59,14 +59,15 @@ export interface OverviewStats {
   averageAnomalyScoreTrend: { timestamp: number; score: number }[];
 }
 
-export function createDevoxGuardClient(
-  baseURL: string = import.meta.env.VITE_API_BASE ?? 'http://localhost:3000',
-  apiKey: string = import.meta.env.VITE_DEVOXGUARD_API_KEY ?? '',
-) {
-  const http = axios.create({
-    baseURL,
-    headers: { 'x-devoxguard-api-key': apiKey },
-  });
+/**
+ * Same-origin client (AR-6, resolved): no API key or base URL is read from
+ * the browser bundle. In production, nginx reverse-proxies
+ * /devoxguard/api/* to the backend and injects the real key server-side
+ * (see nginx.conf.template); in dev, vite.config.ts's server.proxy does
+ * the same against a Node-side-only key.
+ */
+export function createDevoxGuardClient() {
+  const http = axios.create();
 
   return {
     async getFindings(query: FindingsQuery = {}): Promise<FindingsPage> {

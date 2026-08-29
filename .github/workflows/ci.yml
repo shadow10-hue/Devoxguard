@@ -17,7 +17,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Builds the engine once and shares dist/ via artifact with lint and
+  # build-test, instead of each job rebuilding it from source
+  # independently (previously 2 explicit rebuilds, plus a 3rd implicit
+  # one inside the docker job's Dockerfile builder stage — that third one
+  # is a separate concern, addressed by the docker job's layer caching
+  # below, not by this artifact).
+  build-engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w packages/engine
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: engine-dist
+          path: packages/engine/dist
+          retention-days: 1
+
   lint:
+    needs: [build-engine]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -28,9 +52,13 @@ jobs:
           cache: npm
       - run: npm ci
       # Type-aware linting of api-demo resolves @devox/engine through its
-      # compiled dist/, so the engine must build first (same constraint as
-      # the api-demo build itself).
-      - run: npm run build -w packages/engine
+      # compiled dist/ — built once by build-engine above, downloaded
+      # here rather than rebuilt (same constraint as the api-demo build
+      # itself).
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: engine-dist
+          path: packages/engine/dist
       - run: npm run lint
       - run: npm run format:check
 
@@ -45,6 +73,7 @@ jobs:
       - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: security/gitleaks/gitleaks.toml
 
   sca:
     runs-on: ubuntu-latest
@@ -64,9 +93,15 @@ jobs:
       actions: read
       contents: read
       security-events: write
-    # Defaults: recursive scan of the repo (finds package-lock.json),
-    # fails the job on any known vulnerability, uploads SARIF.
+    # Recursive scan of the repo (finds package-lock.json), fails the job
+    # on any known vulnerability, uploads SARIF. --config points at the
+    # relocated suppression register (default scan-args is "-r ./").
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
+    with:
+      scan-args: |-
+        -r
+        ./
+        --config=security/osv-scanner.toml
 
   semgrep:
     runs-on: ubuntu-latest
@@ -75,10 +110,29 @@ jobs:
       image: semgrep/semgrep:1.171.0@sha256:bdf7013b2c3634a487671158da77c554f531742326b543a9464d2adf6c433ac8
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: semgrep scan --config p/typescript --config p/owasp-top-ten --config .semgrep/custom-rules.yml --error --metrics=off
+      - run: semgrep scan --config p/typescript --config p/owasp-top-ten --config security/semgrep/custom-rules.yml --error --metrics=off
+
+  # Lints and syntax-checks the Ansible provisioning/deploy playbooks. The
+  # compose files and workflows are additionally covered by the docker job's
+  # Trivy config (misconfiguration) scan below.
+  iac:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # ubuntu-latest ships Python 3; a venv sidesteps PEP-668 without a
+      # separately-pinned setup-python action.
+      - run: |
+          python3 -m venv .venv
+          . .venv/bin/activate
+          pip install --quiet "ansible-core>=2.16" "ansible-lint>=24.0.0"
+          ansible-galaxy collection install -r ansible/requirements.yml
+          cd ansible
+          ansible-lint
+          ansible-playbook --syntax-check provision.yml deploy.yml
 
   build-test:
-    needs: [lint]
+    needs: [build-engine]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -109,6 +163,15 @@ jobs:
           --health-timeout 5s
           --health-retries 12
           --health-start-period 30s
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -116,8 +179,12 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      # api-demo consumes the engine's compiled dist/, so order matters.
-      - run: npm run build -w packages/engine
+      # api-demo consumes the engine's compiled dist/ — built once by
+      # build-engine above, downloaded here rather than rebuilt.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: engine-dist
+          path: packages/engine/dist
       - run: npm run build -w packages/api-demo
       - run: npm run build -w packages/dashboard
       - run: npm test
@@ -135,8 +202,26 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: docker build -f packages/api-demo/Dockerfile -t devoxguard-api-demo:ci .
-      - run: docker build -f packages/dashboard/Dockerfile -t devoxguard-dashboard:ci .
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      # GHA-cached layers, scoped per image so the two caches don't
+      # thrash each other. load: true so Trivy can scan the image
+      # locally below, same as the plain `docker build` this replaces.
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: packages/api-demo/Dockerfile
+          tags: devoxguard-api-demo:ci
+          load: true
+          cache-from: type=gha,scope=api-demo
+          cache-to: type=gha,mode=max,scope=api-demo
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: packages/dashboard/Dockerfile
+          tags: devoxguard-dashboard:ci
+          load: true
+          cache-from: type=gha,scope=dashboard
+          cache-to: type=gha,mode=max,scope=dashboard
       # Image scans: fail on fixable HIGH/CRITICAL vulnerabilities.
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -145,6 +230,7 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '1'
+          trivyignores: security/trivy/trivyignore
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: image
@@ -152,6 +238,7 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '1'
+          trivyignores: security/trivy/trivyignore
       # IaC/config scan: Dockerfiles, docker-compose, workflow files.
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:

@@ -29,10 +29,11 @@ Everything runs on free/open-source tooling — no SaaS accounts or API tokens.
 
 | Workflow | Triggers | Jobs / gates |
 |---|---|---|
-| `ci.yml` | PRs, push to `main` | `lint` (ESLint check-only, Prettier, `tsc --noEmit`), `secrets` (Gitleaks full history), `sca` (OSV-Scanner on lockfile + `npm audit --audit-level=high`), `semgrep` (OSS rulesets, `--error`), `build-test` (engine → api-demo → dashboard build, all test suites against real Mongo 7 + Elasticsearch 8.15 service containers, `DEVOX_REQUIRE_SERVICES=1` so tests fail loudly instead of self-skipping), `docker` (image builds + Trivy image & config scans) |
+| `ci.yml` | PRs, push to `main` | `lint` (ESLint check-only, Prettier, `tsc --noEmit`), `secrets` (Gitleaks full history), `sca` (OSV-Scanner on lockfile + `npm audit --audit-level=high`), `semgrep` (OSS rulesets, `--error`), `iac` (`ansible-lint` + `--syntax-check` of the Ansible playbooks), `build-test` (engine → api-demo → dashboard build, all test suites against real Mongo 7 + Elasticsearch 8.15 service containers, `DEVOX_REQUIRE_SERVICES=1` so tests fail loudly instead of self-skipping), `docker` (image builds + Trivy image & config scans — the config scan covers Dockerfiles, all compose files, and workflows) |
 | `codeql.yml` | PRs, push to `main`, weekly | CodeQL `javascript-typescript` with `security-extended` queries |
 | `release.yml` | tags `v*` | Build → Trivy gate → push to GHCR → Syft SBOM (SPDX + CycloneDX, attached to the GitHub Release) → Cosign keyless signing → build-provenance attestation |
-| `dast.yml` | weekly, manual, PRs touching `packages/api-demo/**` | Boots Mongo, starts seeded api-demo, OWASP ZAP baseline scan gated by `.zap/rules.tsv` |
+| `cd.yml` | release published, manual | Continuous deployment: resolve digests → **Cosign verify** both images against `release.yml`'s OIDC identity → Trivy re-scan the pulled image → bring the stack up on a disposable runner target and smoke-test it (health + benign 200 + injection **403**) → deploy over SSH (dormant until `DEPLOY_ENABLED` + `DEPLOY_*` secrets are set). Uses `docker-compose.deploy.yml` to run the signed images instead of building from source. |
+| `dast.yml` | weekly, manual, PRs touching `packages/api-demo/**` | Boots Mongo, starts seeded api-demo, OWASP ZAP baseline scan gated by `security/zap/rules.tsv` |
 
 All jobs are **fail-closed**: a scanner error or finding fails the check.
 Every third-party action is **pinned to a full commit SHA** with the version
@@ -50,9 +51,9 @@ be traceable:
 |---|---|---|
 | Semgrep | inline `// nosemgrep: <rule-id>` + justification comment | one per finding, never per-directory |
 | CodeQL | inline `// codeql[<query-id>]` alert suppression | same |
-| Gitleaks | `.gitleaks.toml` allowlist; `.gitleaksignore` for historical commits | exact literal + path scoped, commented; fingerprints justified |
-| Trivy | `.trivyignore` | CVE id + reason + review date |
-| ZAP | `.zap/rules.tsv` | rule id + comment naming the accepted risk |
+| Gitleaks | `security/gitleaks/gitleaks.toml` allowlist; `.gitleaksignore` for historical commits | exact literal + path scoped, commented; fingerprints justified |
+| Trivy | `security/trivy/trivyignore` | CVE id + reason + review date |
+| ZAP | `security/zap/rules.tsv` | rule id + comment naming the accepted risk |
 
 Every suppression must correspond to a row in the **accepted-risk register**
 in [`.github/SECURITY.md`](../.github/SECURITY.md) (AR-1 … AR-7). The PR
@@ -115,7 +116,7 @@ after verification). Findings:
   `p/security-audit`, and `p/nodejsscan` too — do not flag a bare `eval()`
   call for unauthenticated/free Semgrep; that rule lives behind a paid
   Semgrep account, which conflicts with the free-tooling requirement. Fixed
-  by adding [`​.semgrep/custom-rules.yml`](../.semgrep/custom-rules.yml)
+  by adding [`security/semgrep/custom-rules.yml`](../security/semgrep/custom-rules.yml)
   (eval/Function-constructor detection) to the semgrep step. Re-verified:
   the same throwaway branch then failed `semgrep` as expected, with zero
   false positives against the rest of the repo.

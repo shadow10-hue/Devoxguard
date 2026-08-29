@@ -1,6 +1,6 @@
 import { MongoClient } from 'mongodb';
 import { Client as ElasticsearchClient } from '@elastic/elasticsearch';
-import { connectMongoFindings, StoredFinding } from '../../src/storage/mongo.repository';
+import { connectMongoFindings, FINDINGS_COLLECTION_NAME, StoredFinding } from '../../src/storage/mongo.repository';
 import { ElasticsearchFindingIndexer } from '../../src/storage/elasticsearch.indexer';
 
 /**
@@ -89,6 +89,57 @@ describe('storage integration (MongoDB + Elasticsearch)', () => {
 
       const page = await repository.findPage({ type: 'idor' });
       expect(page.items.some((f) => f.id === finding.id)).toBe(true);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('ensureIndexes creates all five expected indexes against a live collection', async () => {
+    if (!servicesAvailable) return;
+
+    const { client } = await connectMongoFindings(MONGO_URI, DB_NAME);
+    try {
+      const indexes = await client.db(DB_NAME).collection(FINDINGS_COLLECTION_NAME).indexes();
+      const byName = new Map(indexes.map((idx) => [JSON.stringify(idx.key), idx]));
+
+      expect(byName.has(JSON.stringify({ timestamp: -1 }))).toBe(true);
+      expect(byName.has(JSON.stringify({ route: 1, severity: 1 }))).toBe(true);
+      expect(byName.has(JSON.stringify({ type: 1 }))).toBe(true);
+
+      const ttlIndex = byName.get(JSON.stringify({ expiresAt: 1 }));
+      expect(ttlIndex?.expireAfterSeconds).toBe(0);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('insertMany populates expiresAt as a real BSON Date, distinct from the Long timestamp', async () => {
+    if (!servicesAvailable) return;
+
+    const { client, repository } = await connectMongoFindings(MONGO_URI, DB_NAME, 30);
+    try {
+      const finding: StoredFinding = {
+        id: `integration-ttl-${Date.now()}`,
+        requestId: 'req-integration-ttl',
+        type: 'idor',
+        severity: 'high',
+        route: '/orders/:id',
+        method: 'GET',
+        userId: 'user-1',
+        detail: 'ttl integration test finding',
+        actionTaken: 'blocked',
+        timestamp: Date.now(),
+      };
+
+      await repository.insertMany([finding]);
+      const raw = await client
+        .db(DB_NAME)
+        .collection(FINDINGS_COLLECTION_NAME)
+        .findOne<{ expiresAt: Date; timestamp: unknown }>({ id: finding.id });
+
+      expect(raw?.expiresAt).toBeInstanceOf(Date);
+      const expectedMs = 30 * 24 * 60 * 60 * 1000;
+      expect(raw!.expiresAt.getTime()).toBeGreaterThan(Date.now() + expectedMs - 60_000);
     } finally {
       await client.close();
     }

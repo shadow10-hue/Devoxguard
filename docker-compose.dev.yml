@@ -31,6 +31,24 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    # Optional: only needed to exercise Redis-backed (shared/horizontally
+    # scalable) anomaly-detector state — see DEVOXGUARD_REDIS_URI in
+    # .env.example. Without it, the engine falls back to in-memory state
+    # unchanged.
+    image: redis:7@sha256:e9b2e45ecd47fbb69b877cf8d045d5cccaaaed52524b6e098b4abe8212994f73
+    container_name: devoxguard-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - devoxguard_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   devoxguard_mongo_data:
   devoxguard_es_data:
+  devoxguard_redis_data:
