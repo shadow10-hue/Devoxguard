@@ -25,7 +25,11 @@ onMounted(async () => {
 
 <template>
   <section>
-    <h1>Overview</h1>
+    <header class="page-header">
+      <span class="eyebrow">Live posture</span>
+      <h1>Overview</h1>
+      <p class="lede">Real-time signal from the DevoxGuard engine — what it blocked, which rules fired, and how anomaly pressure is trending.</p>
+    </header>
 
     <LoadingSkeleton v-if="loading" variant="stat" />
     <ErrorState v-else-if="error" :message="error" />
@@ -35,12 +39,13 @@ onMounted(async () => {
 
       <div class="card">
         <h2>Top rules triggered</h2>
-        <ul v-if="stats.topRulesTriggered.length" class="rule-list">
-          <li v-for="rule in stats.topRulesTriggered" :key="rule.ruleName">
+        <ol v-if="stats.topRulesTriggered.length" class="rule-list">
+          <li v-for="(rule, i) in stats.topRulesTriggered" :key="rule.ruleName">
+            <span class="rule-rank">{{ i + 1 }}</span>
             <code>{{ rule.ruleName }}</code>
             <span class="rule-count">{{ rule.count }}</span>
           </li>
-        </ul>
+        </ol>
         <EmptyState v-else title="No rules triggered yet" />
       </div>
 
@@ -69,22 +74,43 @@ onMounted(async () => {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 .rule-list li {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--border);
+  padding: var(--space-2) var(--space-2);
+  margin: 0 calc(-1 * var(--space-2));
+  border-radius: var(--radius-sm);
+  transition: background-color var(--dur) var(--ease);
 }
-.rule-list li:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
+.rule-list li:hover {
+  background: var(--surface-hover);
+}
+.rule-rank {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+.rule-list code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .rule-count {
-  font-weight: 600;
+  margin-left: auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: var(--text-h);
 }
 </style>

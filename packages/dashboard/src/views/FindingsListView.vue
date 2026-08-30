@@ -64,7 +64,11 @@ onMounted(load);
 
 <template>
   <section>
-    <h1>Findings</h1>
+    <header class="page-header">
+      <span class="eyebrow">Detections</span>
+      <h1>Findings</h1>
+      <p class="lede">Every request the engine flagged — filter by type, severity, or route, then open one for the full captured context.</p>
+    </header>
 
     <div class="filters">
       <input v-model="typeFilter" placeholder="Filter by type…" aria-label="filter by type" />
@@ -127,15 +131,23 @@ onMounted(load);
   font: inherit;
   font-size: 14px;
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-h);
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+.filters input::placeholder {
+  color: var(--text-soft);
 }
 .filters input:focus,
 .filters select:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--ring);
 }
 .card {
   padding: 0;
@@ -148,11 +160,12 @@ table {
 th {
   text-align: left;
   padding: var(--space-3) var(--space-4);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text);
+  letter-spacing: 0.07em;
+  color: var(--text-soft);
+  background: var(--surface-sunken);
   border-bottom: 1px solid var(--border);
 }
 td {
@@ -164,16 +177,29 @@ td {
 tbody tr:last-child td {
   border-bottom: none;
 }
+tbody td:first-child {
+  font-weight: 600;
+  color: var(--text-h);
+}
 .timestamp {
-  color: var(--text);
+  color: var(--text-soft);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .row {
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color var(--dur) var(--ease);
 }
 .row:hover {
   background: var(--surface-hover);
+}
+/* Left accent reveal on hover — a quiet affordance that the row is clickable. */
+.row td:first-child {
+  box-shadow: inset 3px 0 0 transparent;
+  transition: box-shadow var(--dur) var(--ease);
+}
+.row:hover td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 .pagination {
   display: flex;
@@ -188,22 +214,33 @@ tbody tr:last-child td {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-h);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
+  transition:
+    background-color var(--dur) var(--ease),
+    transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur) var(--ease);
 }
 .page-btn:hover:not(:disabled) {
   background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+.page-btn:active:not(:disabled) {
+  transform: scale(0.97);
 }
 .page-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
+  box-shadow: none;
   cursor: not-allowed;
 }
 .page-info {
   font-size: 13px;
-  color: var(--text);
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
 }
 </style>
