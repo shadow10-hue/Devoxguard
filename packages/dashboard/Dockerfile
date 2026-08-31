@@ -22,7 +22,7 @@ ENV VITE_API_BASE=$VITE_API_BASE \
 RUN npm run build -w packages/dashboard
 
 # Unprivileged nginx: runs as uid 101, listens on 8080, no root anywhere.
-FROM nginxinc/nginx-unprivileged:alpine@sha256:a6c3ec0c0d249d68b0682df854d4a9e222b90fb607dc3fcf2f1d2fcbc85d347e
+FROM nginxinc/nginx-unprivileged:alpine@sha256:d9083fe47768377ef55dedafd67d4da7c2f2bc2bece7554954f29359deb0dce9
 COPY packages/dashboard/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/packages/dashboard/dist /usr/share/nginx/html
 # The base image already drops to this user; restated so the policy is
