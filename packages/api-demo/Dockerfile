@@ -3,7 +3,7 @@
 #   docker build -f packages/api-demo/Dockerfile -t devoxguard-api-demo .
 # Base images pinned by digest (supply-chain: tags are mutable, digests not).
 
-FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS builder
+FROM node:26-alpine@sha256:aadf416b2cdce311a8811ba3f0608a61b77dbf997500e2eafe781b51f6a0b019 AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/engine/package.json packages/engine/
@@ -18,7 +18,7 @@ COPY packages/api-demo packages/api-demo
 # engine build includes the mandatory YAML rule copy step.
 RUN npm run build -w packages/engine && npm run build -w packages/api-demo
 
-FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS deps
+FROM node:26-alpine@sha256:aadf416b2cdce311a8811ba3f0608a61b77dbf997500e2eafe781b51f6a0b019 AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/engine/package.json packages/engine/
@@ -26,7 +26,7 @@ COPY packages/api-demo/package.json packages/api-demo/
 COPY packages/dashboard/package.json packages/dashboard/
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
-FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32
+FROM node:26-alpine@sha256:aadf416b2cdce311a8811ba3f0608a61b77dbf997500e2eafe781b51f6a0b019
 ENV NODE_ENV=production
 WORKDIR /app
 # Production node_modules keeps the @devox/engine workspace symlink, so the
