@@ -58,6 +58,20 @@ describe('evaluateRules', () => {
     expect(evaluateRules([rule], baseContext({ params: { id: '1' } }))).toHaveLength(0);
   });
 
+  it('emits exactly one finding for a composed rule even when both branches match', () => {
+    const rule = compiledRule({
+      route: '/users/:id',
+      methode: 'PATCH',
+      condition: 'body.role exists or body.isAdmin exists',
+    });
+    const ctx = baseContext({ route: '/users/:id', method: 'PATCH', body: { role: 'admin', isAdmin: true } });
+
+    const findings = evaluateRules([rule], ctx);
+
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toMatchObject({ ruleName: 'test-rule', actionTaken: 'blocked' });
+  });
+
   it('maps action "journaliser" to actionTaken "logged"', () => {
     const rule = compiledRule({
       action: 'journaliser',

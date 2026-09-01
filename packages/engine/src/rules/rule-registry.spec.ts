@@ -53,6 +53,24 @@ describe('RuleRegistry', () => {
       expect(responsePhase.map((r) => r.nom)).toEqual(['res-phase']);
     });
 
+    it('indexes a mixed request/response condition into the response-phase bucket', () => {
+      const mixedRule = rule('mixed', {
+        action: 'journaliser',
+        conditionAst: {
+          kind: 'and',
+          left: { kind: 'exists', path: { kind: 'path', segments: ['body', 'role'] } },
+          right: { kind: 'exists', path: { kind: 'path', segments: ['response', 'passwordHash'] } },
+        },
+        raw: 'body.role exists and response.passwordHash exists',
+      });
+      const registry = new RuleRegistry([mixedRule]);
+
+      const { requestPhase, responsePhase } = registry.getRulesFor('GET', '/orders/:id');
+
+      expect(requestPhase).toHaveLength(0);
+      expect(responsePhase.map((r) => r.nom)).toEqual(['mixed']);
+    });
+
     it('is case-insensitive on method', () => {
       const registry = new RuleRegistry([rule('a')]);
       expect(registry.getRulesFor('get', '/orders/:id').requestPhase).toHaveLength(1);

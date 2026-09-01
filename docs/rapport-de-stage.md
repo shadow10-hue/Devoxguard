@@ -39,7 +39,7 @@ Cinq bugs réels (détaillés dans `docs/semaine5.md`) n'ont été détectés qu
 
 ## Limites connues
 
-Documentées explicitement dans `docs/architecture.md` §7 : état du moteur d'anomalies en mémoire uniquement (non partagé entre instances horizontalement scalées), détection IDOR limitée aux identifiants numériques, grammaire DSL sans composition booléenne (`and`/`or`) entre conditions, authentification du tableau de bord par clé API statique unique.
+Documentées explicitement dans `docs/architecture.md` §7 : état du moteur d'anomalies en mémoire uniquement (non partagé entre instances horizontalement scalées), détection IDOR limitée aux identifiants numériques, authentification du tableau de bord par clé API statique unique.
 
 ## Conclusion
 

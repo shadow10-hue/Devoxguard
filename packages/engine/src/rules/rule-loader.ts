@@ -29,6 +29,11 @@ export function referencesResponse(node: ConditionNode): boolean {
     case 'in':
     case 'not-in':
       return node.left.segments[0] === 'response' || node.right.segments[0] === 'response';
+    case 'and':
+    case 'or':
+      return referencesResponse(node.left) || referencesResponse(node.right);
+    case 'not':
+      return referencesResponse(node.operand);
   }
 }
 
@@ -41,6 +46,9 @@ function compileRule(raw: RawRuleDefinition, sourceFile: string): CompiledRule {
 
   // Response-phase rules evaluate after the handler already sent the
   // response body, so they can never block — only 'journaliser' is valid.
+  // A condition mixing request and response paths counts as response-phase
+  // (any response.* reference anywhere in the tree), so it falls under the
+  // same restriction.
   if (raw.action === 'bloquer' && referencesResponse(conditionAst)) {
     throw new RuleValidationError(
       `Rule '${raw.nom}' in '${sourceFile}' references response.* with action 'bloquer'; ` +

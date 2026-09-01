@@ -65,4 +65,37 @@ describe('evaluate', () => {
     const ctx = baseContext({ route: '/users/:id/profile' });
     expect(evaluate(condition('response.passwordHash exists'), ctx)).toBe(false);
   });
+
+  describe('boolean composition', () => {
+    it('and: true only when both sides hold', () => {
+      expect(evaluate(condition('body.role exists and query.limit == "50"'), baseContext())).toBe(true);
+      expect(evaluate(condition('body.role exists and query.limit == "10"'), baseContext())).toBe(false);
+      expect(evaluate(condition('body.isAdmin exists and query.limit == "50"'), baseContext())).toBe(false);
+    });
+
+    it('or: true when either side holds', () => {
+      expect(evaluate(condition('body.isAdmin exists or body.role exists'), baseContext())).toBe(true);
+      expect(evaluate(condition('body.role exists or body.isAdmin exists'), baseContext())).toBe(true);
+      expect(evaluate(condition('body.isAdmin exists or body.missing exists'), baseContext())).toBe(false);
+    });
+
+    it('not: inverts its operand', () => {
+      expect(evaluate(condition('not body.isAdmin exists'), baseContext())).toBe(true);
+      expect(evaluate(condition('not body.role exists'), baseContext())).toBe(false);
+    });
+
+    it('nested tree with parentheses', () => {
+      const expr = '(body.role == "admin" or body.role == "root") and not query.limit == "10"';
+      expect(evaluate(condition(expr), baseContext())).toBe(true);
+      expect(evaluate(condition(expr), baseContext({ body: { role: 'user' } }))).toBe(false);
+    });
+
+    it('short-circuits: the right side is not evaluated when the left decides', () => {
+      // A deliberately broken node that would throw inside resolvePath if visited.
+      const broken = { kind: 'exists', path: undefined } as never;
+
+      expect(evaluate({ kind: 'or', left: condition('body.role exists'), right: broken }, baseContext())).toBe(true);
+      expect(evaluate({ kind: 'and', left: condition('body.isAdmin exists'), right: broken }, baseContext())).toBe(false);
+    });
+  });
 });
