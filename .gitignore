@@ -14,6 +14,12 @@ compass-connections.json
 *.sarif
 zap-report*
 
+# Ansible — real inventory/vars (may hold hosts + secrets) and installed deps
+ansible/inventory.ini
+ansible/group_vars/all.yml
+ansible/collections/
+*.retry
+
 # Internal spec docs — not for the public repo
 DevoxGuard_Spec_ClaudeCode.md
 DevoxGuard_Spec_ClaudeCode_v2.md

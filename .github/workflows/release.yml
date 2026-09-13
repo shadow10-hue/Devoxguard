@@ -33,10 +33,29 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       # ---- Build locally and gate on Trivy before anything is published ----
-      - run: docker build -f packages/api-demo/Dockerfile -t api-demo:scan .
-      - run: docker build -f packages/dashboard/Dockerfile -t dashboard:scan .
+      # GHA-cached (scoped per image), load: true so Trivy can scan
+      # locally without pushing. The later push-api/push-dash builds
+      # below reuse this same cache scope, so a same-commit rebuild for
+      # push doesn't redo work already done for the scan gate.
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: packages/api-demo/Dockerfile
+          tags: api-demo:scan
+          load: true
+          cache-from: type=gha,scope=api-demo
+          cache-to: type=gha,mode=max,scope=api-demo
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: packages/dashboard/Dockerfile
+          tags: dashboard:scan
+          load: true
+          cache-from: type=gha,scope=dashboard
+          cache-to: type=gha,mode=max,scope=dashboard
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: image
@@ -44,6 +63,7 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '1'
+          trivyignores: security/trivy/trivyignore
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: image
@@ -51,6 +71,7 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '1'
+          trivyignores: security/trivy/trivyignore
 
       # ---- Push (layer cache from the scan builds) ----
       - id: meta-api
@@ -75,6 +96,8 @@ jobs:
           push: true
           tags: ${{ steps.meta-api.outputs.tags }}
           labels: ${{ steps.meta-api.outputs.labels }}
+          cache-from: type=gha,scope=api-demo
+          cache-to: type=gha,mode=max,scope=api-demo
       - id: push-dash
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
@@ -83,6 +106,8 @@ jobs:
           push: true
           tags: ${{ steps.meta-dash.outputs.tags }}
           labels: ${{ steps.meta-dash.outputs.labels }}
+          cache-from: type=gha,scope=dashboard
+          cache-to: type=gha,mode=max,scope=dashboard
 
       # ---- Sign + provenance (keyless: identity is this workflow's OIDC) ----
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2

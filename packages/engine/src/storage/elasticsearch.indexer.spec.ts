@@ -24,7 +24,9 @@ function mockClient(indexExists: boolean) {
       create: jest.fn().mockResolvedValue(undefined),
     },
     index: jest.fn().mockResolvedValue(undefined),
-    bulk: jest.fn().mockResolvedValue(undefined),
+    bulk: jest.fn().mockResolvedValue({ errors: false, items: [] }),
+    ping: jest.fn().mockResolvedValue(true),
+    close: jest.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -81,5 +83,56 @@ describe('ElasticsearchFindingIndexer', () => {
     expect(call.operations).toHaveLength(4);
     expect(call.operations[0]).toEqual({ index: { _index: FINDINGS_INDEX_NAME, _id: 'f-1' } });
     expect(call.operations[2]).toEqual({ index: { _index: FINDINGS_INDEX_NAME, _id: 'f-2' } });
+  });
+
+  it('ping returns true when the client is reachable', async () => {
+    const client = mockClient(true);
+    const indexer = new ElasticsearchFindingIndexer(client as never);
+
+    await expect(indexer.ping()).resolves.toBe(true);
+  });
+
+  it('ping returns false instead of throwing when the client call rejects', async () => {
+    const client = mockClient(true);
+    client.ping.mockRejectedValue(new Error('connection lost'));
+    const indexer = new ElasticsearchFindingIndexer(client as never);
+
+    await expect(indexer.ping()).resolves.toBe(false);
+  });
+
+  it('index rethrows on failure (devoxguard.guard.ts owns swallowing it for the client)', async () => {
+    const client = mockClient(true);
+    client.index.mockRejectedValue(new Error('es down'));
+    const indexer = new ElasticsearchFindingIndexer(client as never);
+
+    await expect(indexer.index(sampleFinding())).rejects.toThrow('es down');
+  });
+
+  it('indexMany rethrows when the bulk call itself rejects', async () => {
+    const client = mockClient(true);
+    client.bulk.mockRejectedValue(new Error('es down'));
+    const indexer = new ElasticsearchFindingIndexer(client as never);
+
+    await expect(indexer.indexMany([sampleFinding()])).rejects.toThrow('es down');
+  });
+
+  it('indexMany does not throw on a partial bulk failure — logged, not surfaced', async () => {
+    const client = mockClient(true);
+    client.bulk.mockResolvedValue({
+      errors: true,
+      items: [{ index: { error: { type: 'mapper_parsing_exception' } } }, { index: {} }],
+    });
+    const indexer = new ElasticsearchFindingIndexer(client as never);
+
+    await expect(indexer.indexMany([sampleFinding({ id: 'f-1' }), sampleFinding({ id: 'f-2' })])).resolves.toBeUndefined();
+  });
+
+  it('close delegates to the underlying client', async () => {
+    const client = mockClient(true);
+    const indexer = new ElasticsearchFindingIndexer(client as never);
+
+    await indexer.close();
+
+    expect(client.close).toHaveBeenCalled();
   });
 });

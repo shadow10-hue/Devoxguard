@@ -1,0 +1,134 @@
+# Single-VM production deployment. See docs/deployment.md for the full
+# runbook. docker-compose.dev.yml (local Mongo/ES only, host ports
+# published for direct access) is untouched and unrelated to this file.
+#
+#   cp .env.example .env   # fill in DEVOXGUARD_API_KEY, DOMAIN, ACME_EMAIL
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+# Pinned explicitly: both compose files default to the same project name
+# (the parent directory's basename) and define services named mongo/
+# elasticsearch. Without this, running this file after docker-compose.dev.yml
+# from the same directory silently tears down and replaces the dev
+# containers instead of running alongside them (found by actually doing
+# this during verification — the dev containers' data volumes survived
+# untouched, only the containers themselves were recreated, but it's a
+# real footgun this pin removes entirely).
+name: devoxguard-prod
+
+services:
+  mongo:
+    image: mongo:7@sha256:35a5926f71f8b6cb19206bee928c5a85f241a8be99f20c81abe35ae78a73415d
+    restart: unless-stopped
+    volumes:
+      - devoxguard_prod_mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0@sha256:84a73ced8390c059e7bc2858595c68dc36e6f8bdb98895dcab0074eda35ac96e
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - devoxguard_prod_es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    # Optional: only needed to exercise Redis-backed (shared/horizontally
+    # scalable) anomaly-detector state — see DEVOXGUARD_REDIS_URI in
+    # .env.example. Without it, the engine falls back to in-memory state
+    # unchanged. Internal-only, same as mongo/elasticsearch above — never
+    # published to the host.
+    image: redis:7@sha256:e9b2e45ecd47fbb69b877cf8d045d5cccaaaed52524b6e098b4abe8212994f73
+    restart: unless-stopped
+    volumes:
+      - devoxguard_prod_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api-demo:
+    build:
+      context: .
+      dockerfile: packages/api-demo/Dockerfile
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    # No depends_on for redis: it's optional (DEVOXGUARD_REDIS_URI unset
+    # falls back to in-memory anomaly state), so api-demo's startup must
+    # never be gated on it — unlike mongo (fail-closed by design) and
+    # elasticsearch (fail-open but still worth sequencing after).
+    depends_on:
+      mongo:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/devoxguard/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    ports:
+      # Loopback-only: lets you curl the health endpoint directly from the
+      # VM while debugging. Not reachable from outside — the public path
+      # is always through Caddy -> dashboard's nginx proxy.
+      - "127.0.0.1:3000:3000"
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: packages/dashboard/Dockerfile
+    restart: unless-stopped
+    init: true
+    environment:
+      DEVOXGUARD_API_UPSTREAM: http://api-demo:3000
+      DEVOXGUARD_API_KEY: ${DEVOXGUARD_API_KEY}
+    depends_on:
+      api-demo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+      # Edge basic-auth protecting the dashboard + internal API (see
+      # caddy/Caddyfile). Caddy won't start without a hash set.
+      DASHBOARD_AUTH_USER: ${DASHBOARD_AUTH_USER:-admin}
+      DASHBOARD_AUTH_HASH: ${DASHBOARD_AUTH_HASH}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - devoxguard_prod_caddy_data:/data
+      - devoxguard_prod_caddy_config:/config
+    depends_on:
+      dashboard:
+        condition: service_healthy
+
+volumes:
+  devoxguard_prod_mongo_data:
+  devoxguard_prod_es_data:
+  devoxguard_prod_redis_data:
+  devoxguard_prod_caddy_data:
+  devoxguard_prod_caddy_config:

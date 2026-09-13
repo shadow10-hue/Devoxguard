@@ -1,0 +1,89 @@
+---
+# Deploy (or update) the DevoxGuard stack on a provisioned host, using the
+# signed GHCR images. Copies the compose files + Caddy config, renders .env from
+# vaulted variables, verifies each image's Cosign signature, then pulls and
+# starts the stack and waits for it to become healthy.
+#
+#   ansible-playbook deploy.yml --ask-vault-pass
+#   # CD pins immutable digests:
+#   ansible-playbook deploy.yml -e api_image=ghcr.io/o/devoxguard-api-demo@sha256:… \
+#                               -e dash_image=ghcr.io/o/devoxguard-dashboard@sha256:…
+- name: Deploy DevoxGuard stack
+  hosts: devoxguard
+  become: true
+  become_user: "{{ deploy_user | default('deploy') }}"
+  vars:
+    deploy_user: deploy
+    deploy_dir: /opt/devoxguard
+    project_root: "{{ playbook_dir }}/.."
+    # Override with digest-pinned refs (…@sha256:…) in production / from CD.
+    api_image: "ghcr.io/shadow10-hue/devoxguard-api-demo:latest"
+    dash_image: "ghcr.io/shadow10-hue/devoxguard-dashboard:latest"
+    cosign_version: "v2.4.1"
+    cosign_identity_regexp: "^https://github.com/shadow10-hue/Devoxguard/.github/workflows/release.yml@refs/tags/"
+    verify_signatures: true
+
+  tasks:
+    - name: Install a pinned cosign for signature verification
+      become_user: root
+      ansible.builtin.get_url:
+        url: "https://github.com/sigstore/cosign/releases/download/{{ cosign_version }}/cosign-linux-amd64"
+        dest: /usr/local/bin/cosign
+        mode: "0755"
+      when: verify_signatures | bool
+
+    - name: Sync compose files to the deploy dir
+      ansible.builtin.copy:
+        src: "{{ project_root }}/{{ item }}"
+        dest: "{{ deploy_dir }}/{{ item }}"
+        mode: "0640"
+      loop:
+        - docker-compose.prod.yml
+        - docker-compose.deploy.yml
+
+    - name: Sync Caddy config
+      ansible.builtin.copy:
+        src: "{{ project_root }}/caddy/"
+        dest: "{{ deploy_dir }}/caddy/"
+        mode: "0640"
+
+    - name: Render .env from vaulted variables
+      ansible.builtin.template:
+        src: templates/env.j2
+        dest: "{{ deploy_dir }}/.env"
+        mode: "0600"
+      no_log: true
+
+    - name: Verify image signatures with cosign
+      ansible.builtin.command:
+        cmd: >-
+          cosign verify
+          --certificate-identity-regexp {{ cosign_identity_regexp }}
+          --certificate-oidc-issuer https://token.actions.githubusercontent.com
+          {{ item }}
+      loop:
+        - "{{ api_image }}"
+        - "{{ dash_image }}"
+      changed_when: false
+      when: verify_signatures | bool
+
+    - name: Pull and start the stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ deploy_dir }}"
+        files:
+          - docker-compose.prod.yml
+          - docker-compose.deploy.yml
+        pull: always
+        state: present
+      environment:
+        API_IMAGE: "{{ api_image }}"
+        DASH_IMAGE: "{{ dash_image }}"
+
+    - name: Wait for the health endpoint to report OK
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3000/devoxguard/health
+        status_code: 200
+      register: health
+      until: health.status == 200
+      retries: 20
+      delay: 5

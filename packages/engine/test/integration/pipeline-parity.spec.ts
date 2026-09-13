@@ -50,7 +50,19 @@ describe('pipeline parity: hardcoded detectors vs default YAML rules', () => {
     const ctx = baseContext({ route: '/users/:id', method: 'PATCH', params: { id: '1' }, body: { role: 'admin' } });
 
     const detectorFindings = new MassAssignmentDetector().detect(ctx);
-    const ruleFindings = evaluateRules(rules, ctx).filter((f) => f.ruleName === 'mass-assignment-users-role');
+    const ruleFindings = evaluateRules(rules, ctx).filter((f) => f.ruleName === 'mass-assignment-users');
+
+    expect(detectorFindings).toHaveLength(1);
+    expect(ruleFindings).toHaveLength(1);
+    expect(detectorFindings[0].severity).toBe(ruleFindings[0].severity);
+    expect(detectorFindings[0].actionTaken).toBe(ruleFindings[0].actionTaken);
+  });
+
+  it('mass-assignment: the "or" branch fires identically for an injected isAdmin flag', () => {
+    const ctx = baseContext({ route: '/users/:id', method: 'PATCH', params: { id: '1' }, body: { isAdmin: true } });
+
+    const detectorFindings = new MassAssignmentDetector().detect(ctx);
+    const ruleFindings = evaluateRules(rules, ctx).filter((f) => f.ruleName === 'mass-assignment-users');
 
     expect(detectorFindings).toHaveLength(1);
     expect(ruleFindings).toHaveLength(1);

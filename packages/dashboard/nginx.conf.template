@@ -1,0 +1,42 @@
+# Hardened static serving + API reverse proxy for the DevoxGuard dashboard.
+# .template: the base image's entrypoint runs envsubst over this file at
+# container start (see /etc/nginx/templates/ convention on the official
+# nginx image), substituting DEVOXGUARD_API_UPSTREAM/DEVOXGUARD_API_KEY from
+# the container's environment — no rebuild needed to change either at
+# deploy time. nginx built-ins like $host/$scheme are left untouched since
+# envsubst is only told about the two vars named below.
+server {
+    listen 8080;
+    server_tokens off;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy no-referrer always;
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    # connect-src is now 'self': the SPA calls its own origin, which this
+    # server reverse-proxies to the backend (AR-6) — no more open wildcard.
+    add_header Content-Security-Policy "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'" always;
+
+    location = /healthz {
+        default_type text/plain;
+        return 200 'ok';
+    }
+
+    # AR-6 fix: the API key lives only here, injected server-side at
+    # container start — the SPA never sees it (see devoxguard-client.ts).
+    location /devoxguard/api/ {
+        proxy_pass ${DEVOXGUARD_API_UPSTREAM}/devoxguard/api/;
+        proxy_set_header x-devoxguard-api-key "${DEVOXGUARD_API_KEY}";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # vue-router history mode: unknown paths fall back to the SPA shell.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

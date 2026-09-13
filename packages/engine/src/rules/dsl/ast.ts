@@ -1,4 +1,4 @@
-export type ConditionNode = ComparisonNode | ExistsNode | InNode;
+export type ConditionNode = ComparisonNode | ExistsNode | InNode | LogicalNode | NotNode;
 
 export interface PathNode {
   kind: 'path';
@@ -21,4 +21,15 @@ export interface InNode {
   kind: 'in' | 'not-in';
   left: PathNode;
   right: PathNode; // référence à un tableau du contexte
+}
+
+export interface LogicalNode {
+  kind: 'and' | 'or';
+  left: ConditionNode;
+  right: ConditionNode;
+}
+
+export interface NotNode {
+  kind: 'not';
+  operand: ConditionNode;
 }

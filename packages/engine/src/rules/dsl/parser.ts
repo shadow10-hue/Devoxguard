@@ -1,5 +1,7 @@
 import { DslSyntaxError, Token } from './tokenizer';
-import { ComparisonNode, ConditionNode, ExistsNode, InNode, PathNode } from './ast';
+import { ComparisonNode, ConditionNode, ExistsNode, InNode, NotNode, PathNode } from './ast';
+
+const MAX_PAREN_DEPTH = 16;
 
 function toPath(token: Token): PathNode {
   return { kind: 'path', segments: token.value.split('.') };
@@ -15,74 +17,166 @@ function parseLiteral(token: Token): { kind: 'literal'; value: string | number |
 }
 
 /**
- * Parses a single `expression := comparaison` per the condition grammar
- * (spec section 3.2). `not` + `in` (two KEYWORD tokens from the
- * tokenizer) are fused here into a single InNode{kind:'not-in'}.
+ * Recursive-descent parser over the condition grammar (spec section 3.2):
+ *
+ *   expression  := disjonction
+ *   disjonction := conjonction ("or" conjonction)*
+ *   conjonction := negation ("and" negation)*
+ *   negation    := "not" negation | terme
+ *   terme       := "(" disjonction ")" | comparaison
+ *
+ * `or` binds loosest, then `and`, then prefix `not`; both binary operators
+ * are left-associative. `not` + `in` after a path (two KEYWORD tokens from
+ * the tokenizer) are still fused into a single InNode{kind:'not-in'};
+ * `not` at the start of a term is prefix negation. Parenthesized nesting
+ * is capped at MAX_PAREN_DEPTH to keep stack depth and errors sane.
  */
 export function parse(tokens: Token[]): ConditionNode {
   if (tokens.length === 0) {
     throw new DslSyntaxError('Empty condition', 0);
   }
 
-  let i = 0;
-  const pathToken = tokens[i];
-  if (pathToken.type !== 'IDENTIFIER') {
-    throw new DslSyntaxError(
-      `Expected a path at the start of the condition, got '${pathToken.value}'`,
-      pathToken.position,
-    );
-  }
-  const left = toPath(pathToken);
-  i += 1;
+  let pos = 0;
+  const peek = (): Token | undefined => tokens[pos];
+  const next = (): Token => tokens[pos++];
+  const isKeyword = (token: Token | undefined, value: string): boolean =>
+    token !== undefined && token.type === 'KEYWORD' && token.value === value;
 
-  const opToken = tokens[i];
-  if (!opToken) {
-    throw new DslSyntaxError(
-      'Unexpected end of condition after path',
-      pathToken.position + pathToken.value.length,
-    );
-  }
+  function parseSimple(): ConditionNode {
+    const pathToken = next();
+    if (pathToken.type !== 'IDENTIFIER') {
+      throw new DslSyntaxError(
+        `Expected a path at the start of the condition, got '${pathToken.value}'`,
+        pathToken.position,
+      );
+    }
+    const left = toPath(pathToken);
 
-  let node: ConditionNode;
+    const opToken = peek();
+    if (!opToken) {
+      throw new DslSyntaxError(
+        'Unexpected end of condition after path',
+        pathToken.position + pathToken.value.length,
+      );
+    }
 
-  if (opToken.type === 'KEYWORD' && opToken.value === 'exists') {
-    node = { kind: 'exists', path: left } satisfies ExistsNode;
-    i += 1;
-  } else if (opToken.type === 'KEYWORD' && opToken.value === 'in') {
-    i += 1;
-    const rightToken = tokens[i];
-    if (!rightToken || rightToken.type !== 'IDENTIFIER') {
-      throw new DslSyntaxError(`Expected a path after 'in'`, rightToken?.position ?? opToken.position + opToken.value.length);
+    if (isKeyword(opToken, 'exists')) {
+      next();
+      return { kind: 'exists', path: left } satisfies ExistsNode;
     }
-    node = { kind: 'in', left, right: toPath(rightToken) } satisfies InNode;
-    i += 1;
-  } else if (opToken.type === 'KEYWORD' && opToken.value === 'not') {
-    i += 1;
-    const inToken = tokens[i];
-    if (!inToken || inToken.type !== 'KEYWORD' || inToken.value !== 'in') {
-      throw new DslSyntaxError(`Expected 'in' after 'not'`, inToken?.position ?? opToken.position + opToken.value.length);
+
+    if (isKeyword(opToken, 'in')) {
+      next();
+      const rightToken = peek();
+      if (!rightToken || rightToken.type !== 'IDENTIFIER') {
+        throw new DslSyntaxError(`Expected a path after 'in'`, rightToken?.position ?? opToken.position + opToken.value.length);
+      }
+      next();
+      return { kind: 'in', left, right: toPath(rightToken) } satisfies InNode;
     }
-    i += 1;
-    const rightToken = tokens[i];
-    if (!rightToken || rightToken.type !== 'IDENTIFIER') {
-      throw new DslSyntaxError(`Expected a path after 'not in'`, rightToken?.position ?? inToken.position + inToken.value.length);
+
+    if (isKeyword(opToken, 'not')) {
+      next();
+      const inToken = peek();
+      if (!inToken || !isKeyword(inToken, 'in')) {
+        throw new DslSyntaxError(`Expected 'in' after 'not'`, inToken?.position ?? opToken.position + opToken.value.length);
+      }
+      next();
+      const rightToken = peek();
+      if (!rightToken || rightToken.type !== 'IDENTIFIER') {
+        throw new DslSyntaxError(`Expected a path after 'not in'`, rightToken?.position ?? inToken.position + inToken.value.length);
+      }
+      next();
+      return { kind: 'not-in', left, right: toPath(rightToken) } satisfies InNode;
     }
-    node = { kind: 'not-in', left, right: toPath(rightToken) } satisfies InNode;
-    i += 1;
-  } else if (opToken.type === 'OPERATOR' && (opToken.value === '==' || opToken.value === '!=')) {
-    i += 1;
-    const valueToken = tokens[i];
-    if (!valueToken) {
-      throw new DslSyntaxError(`Expected a value after '${opToken.value}'`, opToken.position + opToken.value.length);
+
+    if (opToken.type === 'OPERATOR' && (opToken.value === '==' || opToken.value === '!=')) {
+      next();
+      const valueToken = peek();
+      if (!valueToken) {
+        throw new DslSyntaxError(`Expected a value after '${opToken.value}'`, opToken.position + opToken.value.length);
+      }
+      next();
+      const literal = parseLiteral(valueToken);
+      return { kind: 'comparison', left, operator: opToken.value, right: literal } satisfies ComparisonNode;
     }
-    const literal = parseLiteral(valueToken);
-    node = { kind: 'comparison', left, operator: opToken.value, right: literal } satisfies ComparisonNode;
-    i += 1;
-  } else {
+
     throw new DslSyntaxError(`Unexpected token '${opToken.value}'`, opToken.position);
   }
 
-  const trailing = tokens[i];
+  function parsePrimary(depth: number): ConditionNode {
+    const token = peek();
+
+    if (isKeyword(token, 'not')) {
+      const notToken = next();
+      if (!peek()) {
+        throw new DslSyntaxError(
+          `Unexpected end of condition after 'not'`,
+          notToken.position + notToken.value.length,
+        );
+      }
+      return { kind: 'not', operand: parsePrimary(depth) } satisfies NotNode;
+    }
+
+    if (token?.type === 'LPAREN') {
+      const openToken = next();
+      if (depth + 1 > MAX_PAREN_DEPTH) {
+        throw new DslSyntaxError(
+          `Condition nesting too deep (max ${MAX_PAREN_DEPTH} levels of parentheses)`,
+          openToken.position,
+        );
+      }
+      if (peek()?.type === 'RPAREN') {
+        throw new DslSyntaxError(`Empty parentheses`, openToken.position);
+      }
+      const inner = parseDisjunction(depth + 1);
+      const closeToken = peek();
+      if (!closeToken || closeToken.type !== 'RPAREN') {
+        throw new DslSyntaxError(
+          `Expected ')' to close '('`,
+          closeToken?.position ?? openToken.position + 1,
+        );
+      }
+      next();
+      return inner;
+    }
+
+    return parseSimple();
+  }
+
+  function parseConjunction(depth: number): ConditionNode {
+    let node = parsePrimary(depth);
+    while (isKeyword(peek(), 'and')) {
+      const opToken = next();
+      if (!peek()) {
+        throw new DslSyntaxError(
+          `Unexpected end of condition after 'and'`,
+          opToken.position + opToken.value.length,
+        );
+      }
+      node = { kind: 'and', left: node, right: parsePrimary(depth) };
+    }
+    return node;
+  }
+
+  function parseDisjunction(depth: number): ConditionNode {
+    let node = parseConjunction(depth);
+    while (isKeyword(peek(), 'or')) {
+      const opToken = next();
+      if (!peek()) {
+        throw new DslSyntaxError(
+          `Unexpected end of condition after 'or'`,
+          opToken.position + opToken.value.length,
+        );
+      }
+      node = { kind: 'or', left: node, right: parseConjunction(depth) };
+    }
+    return node;
+  }
+
+  const node = parseDisjunction(0);
+
+  const trailing = peek();
   if (trailing) {
     throw new DslSyntaxError(`Unexpected token '${trailing.value}' after expression`, trailing.position);
   }

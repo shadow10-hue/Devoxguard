@@ -30,6 +30,7 @@ function mockCollection(items: StoredFinding[]) {
   return {
     createIndex: jest.fn().mockResolvedValue(undefined),
     insertMany: jest.fn().mockResolvedValue(undefined),
+    estimatedDocumentCount: jest.fn().mockResolvedValue(items.length),
     findOne: jest.fn().mockImplementation((filter: { id: string }) => {
       return Promise.resolve(items.find((i) => i.id === filter.id) ?? null);
     }),
@@ -42,7 +43,7 @@ function mockCollection(items: StoredFinding[]) {
 }
 
 describe('MongoFindingRepository', () => {
-  it('ensureIndexes creates the timestamp and route+severity indexes', async () => {
+  it('ensureIndexes creates the timestamp, route+severity, type, and expiresAt TTL indexes', async () => {
     const collection = mockCollection([]);
     const repo = new MongoFindingRepository(collection);
 
@@ -50,6 +51,8 @@ describe('MongoFindingRepository', () => {
 
     expect(collection.createIndex).toHaveBeenCalledWith({ timestamp: -1 });
     expect(collection.createIndex).toHaveBeenCalledWith({ route: 1, severity: 1 });
+    expect(collection.createIndex).toHaveBeenCalledWith({ type: 1 });
+    expect(collection.createIndex).toHaveBeenCalledWith({ expiresAt: 1 }, { expireAfterSeconds: 0 });
   });
 
   it('insertMany is a no-op for an empty array', async () => {
@@ -77,6 +80,36 @@ describe('MongoFindingRepository', () => {
     expect(insertedDocs).toHaveLength(1);
     expect(Long.isLong(insertedDocs[0].timestamp)).toBe(true);
     expect(insertedDocs[0].timestamp.toNumber()).toBe(findings[0].timestamp);
+  });
+
+  it('insertMany stamps each document with a BSON Date expiresAt, distinct from the Long timestamp, honoring the configured retention', async () => {
+    const collection = mockCollection([]);
+    const repo = new MongoFindingRepository(collection, 30); // 30-day retention
+    const before = Date.now();
+
+    await repo.insertMany([sampleFinding()]);
+
+    const insertManyMock = collection.insertMany as unknown as jest.Mock;
+    const [insertedDocs] = insertManyMock.mock.calls[0] as [Array<{ expiresAt: Date }>];
+    const expiresAt = insertedDocs[0].expiresAt;
+
+    expect(expiresAt).toBeInstanceOf(Date);
+    const expectedMs = 30 * 24 * 60 * 60 * 1000;
+    expect(expiresAt.getTime()).toBeGreaterThanOrEqual(before + expectedMs);
+    expect(expiresAt.getTime()).toBeLessThanOrEqual(Date.now() + expectedMs + 1000);
+  });
+
+  it('insertMany defaults retention to 90 days when none is configured', async () => {
+    const collection = mockCollection([]);
+    const repo = new MongoFindingRepository(collection);
+    const before = Date.now();
+
+    await repo.insertMany([sampleFinding()]);
+
+    const insertManyMock = collection.insertMany as unknown as jest.Mock;
+    const [insertedDocs] = insertManyMock.mock.calls[0] as [Array<{ expiresAt: Date }>];
+    const expectedMs = 90 * 24 * 60 * 60 * 1000;
+    expect(insertedDocs[0].expiresAt.getTime()).toBeGreaterThanOrEqual(before + expectedMs);
   });
 
   it('findById returns the matching finding', async () => {
@@ -113,6 +146,26 @@ describe('MongoFindingRepository', () => {
     expect(collection.cursor.limit).toHaveBeenCalledWith(5);
   });
 
+  it('findPage caps the page size so a caller cannot request an unbounded dump', async () => {
+    const collection = mockCollection([]);
+    const repo = new MongoFindingRepository(collection);
+
+    const result = await repo.findPage({ pageSize: 100000 });
+
+    expect(collection.cursor.limit).toHaveBeenCalledWith(100);
+    expect(result.pageSize).toBe(100);
+  });
+
+  it('findPage sanitizes NaN/negative pagination back to safe defaults', async () => {
+    const collection = mockCollection([]);
+    const repo = new MongoFindingRepository(collection);
+
+    await repo.findPage({ page: Number.NaN, pageSize: -5 });
+
+    expect(collection.cursor.skip).toHaveBeenCalledWith(0); // page clamped to 1 -> skip 0
+    expect(collection.cursor.limit).toHaveBeenCalledWith(20); // pageSize clamped to default
+  });
+
   it('countBlockedSince filters by actionTaken blocked and a minimum timestamp', async () => {
     const collection = mockCollection([]);
     const repo = new MongoFindingRepository(collection);
@@ -120,6 +173,21 @@ describe('MongoFindingRepository', () => {
     await repo.countBlockedSince(1000);
 
     expect(collection.countDocuments).toHaveBeenCalledWith({ actionTaken: 'blocked', timestamp: { $gte: 1000 } });
+  });
+
+  it('ping returns true when the collection is reachable', async () => {
+    const collection = mockCollection([]);
+    const repo = new MongoFindingRepository(collection);
+
+    await expect(repo.ping()).resolves.toBe(true);
+  });
+
+  it('ping returns false instead of throwing when the collection call rejects', async () => {
+    const collection = mockCollection([]);
+    (collection.estimatedDocumentCount as jest.Mock).mockRejectedValue(new Error('connection lost'));
+    const repo = new MongoFindingRepository(collection);
+
+    await expect(repo.ping()).resolves.toBe(false);
   });
 
   it('topRulesTriggered aggregates and maps _id to ruleName', async () => {

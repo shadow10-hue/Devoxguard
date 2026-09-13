@@ -48,4 +48,109 @@ describe('parse', () => {
   it('throws on trailing tokens after a complete expression', () => {
     expect(() => parse(tokenize('body.role exists exists'))).toThrow(DslSyntaxError);
   });
+
+  describe('boolean composition', () => {
+    const cmp = (path: string[], value: number) => ({
+      kind: 'comparison',
+      left: { kind: 'path', segments: path },
+      operator: '==',
+      right: { kind: 'literal', value },
+    });
+
+    it('"and" binds tighter than "or"', () => {
+      const ast = parse(tokenize('body.a == 1 or body.b == 2 and body.c == 3'));
+
+      expect(ast).toEqual({
+        kind: 'or',
+        left: cmp(['body', 'a'], 1),
+        right: {
+          kind: 'and',
+          left: cmp(['body', 'b'], 2),
+          right: cmp(['body', 'c'], 3),
+        },
+      });
+    });
+
+    it('parentheses override precedence', () => {
+      const ast = parse(tokenize('(body.a == 1 or body.b == 2) and body.c == 3'));
+
+      expect(ast).toEqual({
+        kind: 'and',
+        left: {
+          kind: 'or',
+          left: cmp(['body', 'a'], 1),
+          right: cmp(['body', 'b'], 2),
+        },
+        right: cmp(['body', 'c'], 3),
+      });
+    });
+
+    it('chains of the same operator fold left-associative', () => {
+      const ast = parse(tokenize('body.a == 1 and body.b == 2 and body.c == 3'));
+
+      expect(ast).toEqual({
+        kind: 'and',
+        left: {
+          kind: 'and',
+          left: cmp(['body', 'a'], 1),
+          right: cmp(['body', 'b'], 2),
+        },
+        right: cmp(['body', 'c'], 3),
+      });
+    });
+
+    it('prefix "not" binds tighter than "and"', () => {
+      const ast = parse(tokenize('not body.a exists and body.b exists'));
+
+      expect(ast).toEqual({
+        kind: 'and',
+        left: { kind: 'not', operand: { kind: 'exists', path: { kind: 'path', segments: ['body', 'a'] } } },
+        right: { kind: 'exists', path: { kind: 'path', segments: ['body', 'b'] } },
+      });
+    });
+
+    it('"not" nests ("not not x") and applies to parenthesized groups', () => {
+      expect(parse(tokenize('not not body.a exists'))).toEqual({
+        kind: 'not',
+        operand: { kind: 'not', operand: { kind: 'exists', path: { kind: 'path', segments: ['body', 'a'] } } },
+      });
+      expect(parse(tokenize('not (body.a exists or body.b exists)'))).toMatchObject({
+        kind: 'not',
+        operand: { kind: 'or' },
+      });
+    });
+
+    it('a lone simple condition still parses to a bare node (backward compat)', () => {
+      expect(parse(tokenize('body.role exists')).kind).toBe('exists');
+      expect(parse(tokenize('body.a not in user.x')).kind).toBe('not-in');
+    });
+
+    it('throws on a dangling binary operator', () => {
+      expect(() => parse(tokenize('body.a exists and'))).toThrow(DslSyntaxError);
+      expect(() => parse(tokenize('body.a exists or'))).toThrow(DslSyntaxError);
+    });
+
+    it('throws on a leading binary operator', () => {
+      expect(() => parse(tokenize('and body.a exists'))).toThrow(DslSyntaxError);
+    });
+
+    it('throws on unbalanced parentheses', () => {
+      expect(() => parse(tokenize('(body.a exists'))).toThrow(`Expected ')' to close '('`);
+      expect(() => parse(tokenize('body.a exists)'))).toThrow(`Unexpected token ')' after expression`);
+    });
+
+    it('throws on empty parentheses', () => {
+      expect(() => parse(tokenize('()'))).toThrow(DslSyntaxError);
+    });
+
+    it('throws on "not" with nothing after it', () => {
+      expect(() => parse(tokenize('not'))).toThrow(`Unexpected end of condition after 'not'`);
+    });
+
+    it('throws when parenthesized nesting exceeds 16 levels', () => {
+      const deep = (n: number) => '('.repeat(n) + 'body.a exists' + ')'.repeat(n);
+      expect(parse(tokenize(deep(16))).kind).toBe('exists');
+      expect(() => parse(tokenize(deep(17)))).toThrow('Condition nesting too deep (max 16 levels of parentheses)');
+    });
+  });
 });

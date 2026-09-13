@@ -1,0 +1,35 @@
+# TLS edge for the single-VM production deployment (see
+# docker-compose.prod.yml and docs/deployment.md). Caddy automatically
+# obtains and renews a Let's Encrypt certificate for {$DOMAIN}, provided
+# its DNS A record already points at this VM and ports 80/443 are
+# reachable — port 80 handles the ACME HTTP-01 challenge and redirects
+# to 443; nothing else needs configuring.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode gzip
+
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+	}
+
+	# Authentication at the edge (security fix). The dashboard and, through
+	# it, the internal DevoxGuard API (/devoxguard/api/*) are only reachable
+	# after basic auth here — otherwise anyone on the internet could hit the
+	# API, since the dashboard's nginx injects the real API key server-side
+	# for every request that reaches it. Credentials come from the container
+	# environment; DASHBOARD_AUTH_HASH is a bcrypt hash produced with
+	#   docker run --rm caddy:2-alpine caddy hash-password --plaintext '…'
+	# With no hash set Caddy refuses to start (fail-closed), rather than
+	# silently exposing the API unauthenticated.
+	basic_auth {
+		{$DASHBOARD_AUTH_USER} {$DASHBOARD_AUTH_HASH}
+	}
+
+	# dashboard's own nginx handles the rest of the routing: serves the
+	# SPA and reverse-proxies /devoxguard/api/* to api-demo, injecting
+	# the API key server-side (see packages/dashboard/nginx.conf.template).
+	reverse_proxy dashboard:8080
+}

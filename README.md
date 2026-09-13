@@ -2,7 +2,7 @@
 
 A proprietary application-security engine (REST request analysis, a hand-rolled DSL rule engine, behavioral anomaly detection) packaged as a reusable NestJS module, with a Vue dashboard for operations.
 
-See `docs/architecture.md`, `docs/dsl-spec.md`, and `docs/anomaly-engine.md` for technical documentation, and `docs/rapport-de-stage.md` / `docs/semaine{1..5}.md` for the internship report.
+See `docs/architecture.md`, `docs/dsl-spec.md`, and `docs/anomaly-engine.md` for technical documentation, `docs/deployment.md` for running the full stack on a single production VM, and `docs/rapport-de-stage.md` / `docs/semaine{1..5}.md` for the internship report.
 
 ## Packages
 

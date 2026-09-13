@@ -5,19 +5,12 @@ import { createDevoxGuardClient } from './devoxguard-client';
 vi.mock('axios');
 
 describe('createDevoxGuardClient', () => {
-  it('sends the x-devoxguard-api-key header on every request', async () => {
-    const get = vi.fn().mockResolvedValue({ data: { items: [], total: 0, page: 1, pageSize: 20 } });
-    vi.mocked(axios.create).mockReturnValue({ get } as never);
+  it('creates a same-origin client with no API key or base URL baked in (AR-6)', () => {
+    vi.mocked(axios.create).mockReturnValue({} as never);
 
-    const client = createDevoxGuardClient('http://localhost:3000', 'secret-key');
-    await client.getFindings();
+    createDevoxGuardClient();
 
-    expect(axios.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        baseURL: 'http://localhost:3000',
-        headers: { 'x-devoxguard-api-key': 'secret-key' },
-      }),
-    );
+    expect(axios.create).toHaveBeenCalledWith();
   });
 
   it('getFinding requests the correct path and returns the response data', async () => {
@@ -25,7 +18,7 @@ describe('createDevoxGuardClient', () => {
     const get = vi.fn().mockResolvedValue({ data: finding });
     vi.mocked(axios.create).mockReturnValue({ get } as never);
 
-    const client = createDevoxGuardClient('http://localhost:3000', 'secret-key');
+    const client = createDevoxGuardClient();
     const result = await client.getFinding('f-1');
 
     expect(get).toHaveBeenCalledWith('/devoxguard/api/findings/f-1');
@@ -36,7 +29,7 @@ describe('createDevoxGuardClient', () => {
     const get = vi.fn().mockResolvedValue({ data: { items: [], total: 0, page: 1, pageSize: 20 } });
     vi.mocked(axios.create).mockReturnValue({ get } as never);
 
-    const client = createDevoxGuardClient('http://localhost:3000', 'secret-key');
+    const client = createDevoxGuardClient();
     await client.getFindings({ type: 'idor', severity: 'high' });
 
     expect(get).toHaveBeenCalledWith('/devoxguard/api/findings', {

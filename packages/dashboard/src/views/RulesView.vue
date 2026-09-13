@@ -24,7 +24,11 @@ onMounted(async () => {
 
 <template>
   <section>
-    <h1>Rules</h1>
+    <header class="page-header">
+      <span class="eyebrow">Policy</span>
+      <h1>Rules</h1>
+      <p class="lede">The active detection ruleset the engine evaluates on every request, loaded live from the guard.</p>
+    </header>
     <LoadingSkeleton v-if="loading" variant="table" :rows="4" />
     <ErrorState v-else-if="error" :message="error" />
     <EmptyState v-else-if="rules.length === 0" title="No rules loaded" />
@@ -67,11 +71,12 @@ table {
 th {
   text-align: left;
   padding: var(--space-3) var(--space-4);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text);
+  letter-spacing: 0.07em;
+  color: var(--text-soft);
+  background: var(--surface-sunken);
   border-bottom: 1px solid var(--border);
 }
 td {
@@ -79,6 +84,12 @@ td {
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border);
   font-size: 14px;
+}
+tbody tr {
+  transition: background-color var(--dur) var(--ease);
+}
+tbody tr:hover {
+  background: var(--surface-hover);
 }
 tbody tr:last-child td {
   border-bottom: none;

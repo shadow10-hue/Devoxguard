@@ -2,14 +2,19 @@ import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { FindingsController } from '../../src/dashboard/findings.controller';
+import { HealthController } from '../../src/dashboard/health.controller';
+import { MetricsController } from '../../src/dashboard/metrics.controller';
 import { RulesController } from '../../src/dashboard/rules.controller';
 import { StatsController } from '../../src/dashboard/stats.controller';
 import { DEVOXGUARD_CONFIG } from '../../src/devoxguard-config';
-import { InternalApiKeyGuard } from '../../src/guard/internal-api-key.guard';
+import { DEVOXGUARD_AUTH_RATE_LIMITER, InternalApiKeyGuard } from '../../src/guard/internal-api-key.guard';
+import { TokenBucket } from '../../src/guard/rate-limiter/token-bucket';
 import { AnomalyScoreTrendTracker } from '../../src/anomaly/anomaly-score-trend.tracker';
 import { RuleRegistry } from '../../src/rules/rule-registry';
 import { CompiledRule } from '../../src/rules/rule.types';
+import { ElasticsearchFindingIndexer } from '../../src/storage/elasticsearch.indexer';
 import { MongoFindingRepository, StoredFinding } from '../../src/storage/mongo.repository';
+import { ELASTICSEARCH_INDEXER } from '../../src/storage/tokens';
 
 const API_KEY = 'test-api-key';
 
@@ -43,7 +48,10 @@ function sampleRule(): CompiledRule {
 
 describe('DevoxGuard internal dashboard API (e2e)', () => {
   let app: INestApplication;
-  let repository: jest.Mocked<Pick<MongoFindingRepository, 'findPage' | 'findById' | 'countBlockedSince' | 'topRulesTriggered'>>;
+  let repository: jest.Mocked<
+    Pick<MongoFindingRepository, 'findPage' | 'findById' | 'countBlockedSince' | 'topRulesTriggered' | 'ping'>
+  >;
+  let indexer: jest.Mocked<Pick<ElasticsearchFindingIndexer, 'ping'>>;
 
   beforeEach(async () => {
     repository = {
@@ -51,14 +59,18 @@ describe('DevoxGuard internal dashboard API (e2e)', () => {
       findById: jest.fn(),
       countBlockedSince: jest.fn(),
       topRulesTriggered: jest.fn(),
+      ping: jest.fn().mockResolvedValue(true),
     };
+    indexer = { ping: jest.fn().mockResolvedValue(true) };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      controllers: [FindingsController, RulesController, StatsController],
+      controllers: [FindingsController, RulesController, StatsController, HealthController, MetricsController],
       providers: [
         { provide: DEVOXGUARD_CONFIG, useValue: { apiKey: API_KEY } },
+        { provide: DEVOXGUARD_AUTH_RATE_LIMITER, useValue: new TokenBucket(10, 0.2) },
         InternalApiKeyGuard,
         { provide: MongoFindingRepository, useValue: repository },
+        { provide: ELASTICSEARCH_INDEXER, useValue: indexer },
         { provide: RuleRegistry, useValue: new RuleRegistry([sampleRule()]) },
         { provide: AnomalyScoreTrendTracker, useValue: new AnomalyScoreTrendTracker() },
       ],
@@ -157,5 +169,43 @@ describe('DevoxGuard internal dashboard API (e2e)', () => {
       topRulesTriggered: [{ ruleName: 'idor-orders', count: 3 }],
       averageAnomalyScoreTrend: [],
     });
+  });
+
+  it('GET /devoxguard/health requires no API key and reports ok when both stores are reachable', async () => {
+    const res = await request(app.getHttpServer()).get('/devoxguard/health').expect(200);
+
+    expect(res.body).toEqual({ status: 'ok', checks: { mongo: true, elasticsearch: true } });
+  });
+
+  it('GET /devoxguard/health is fail-open on Elasticsearch: still 200 when only ES is down', async () => {
+    indexer.ping.mockResolvedValue(false);
+
+    const res = await request(app.getHttpServer()).get('/devoxguard/health').expect(200);
+
+    expect(res.body).toEqual({ status: 'ok', checks: { mongo: true, elasticsearch: false } });
+  });
+
+  it('GET /devoxguard/health is fail-closed on Mongo: 503 when Mongo is unreachable', async () => {
+    repository.ping.mockResolvedValue(false);
+
+    const res = await request(app.getHttpServer()).get('/devoxguard/health').expect(503);
+
+    expect(res.body).toMatchObject({ checks: { mongo: false } });
+  });
+
+  it('GET /devoxguard/metrics rejects requests without an API key with 401', async () => {
+    await request(app.getHttpServer()).get('/devoxguard/metrics').expect(401);
+  });
+
+  it('GET /devoxguard/metrics returns Prometheus text format including default Node process metrics', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/devoxguard/metrics')
+      .set('x-devoxguard-api-key', API_KEY)
+      .expect(200);
+
+    expect(res.headers['content-type']).toMatch(/text\/plain/);
+    // collectDefaultMetrics() wiring — proves the real DI graph exposes
+    // it end-to-end, not just that the controller in isolation returns text.
+    expect(res.text).toMatch(/process_cpu_user_seconds_total/);
   });
 });

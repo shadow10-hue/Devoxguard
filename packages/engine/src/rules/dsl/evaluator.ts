@@ -35,5 +35,11 @@ export function evaluate(node: ConditionNode, context: RequestContext): boolean 
       const isIn = Array.isArray(list) && list.includes(value);
       return node.kind === 'in' ? isIn : !isIn;
     }
+    case 'and':
+      return evaluate(node.left, context) && evaluate(node.right, context);
+    case 'or':
+      return evaluate(node.left, context) || evaluate(node.right, context);
+    case 'not':
+      return !evaluate(node.operand, context);
   }
 }

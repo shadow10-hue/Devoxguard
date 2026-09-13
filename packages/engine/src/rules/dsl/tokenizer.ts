@@ -1,4 +1,12 @@
-export type TokenType = 'IDENTIFIER' | 'DOT' | 'OPERATOR' | 'STRING' | 'NUMBER' | 'KEYWORD';
+export type TokenType =
+  | 'IDENTIFIER'
+  | 'DOT'
+  | 'OPERATOR'
+  | 'STRING'
+  | 'NUMBER'
+  | 'KEYWORD'
+  | 'LPAREN'
+  | 'RPAREN';
 
 export interface Token {
   type: TokenType;
@@ -16,7 +24,7 @@ export class DslSyntaxError extends Error {
   }
 }
 
-const KEYWORDS = new Set(['not', 'in', 'exists']);
+const KEYWORDS = new Set(['not', 'in', 'exists', 'and', 'or']);
 
 function isIdentStart(ch: string | undefined): boolean {
   return ch !== undefined && /[a-zA-Z_]/.test(ch);
@@ -111,6 +119,18 @@ export function tokenize(expr: string): Token[] {
       const { token, next } = scanString(expr, i);
       tokens.push(token);
       i = next;
+      continue;
+    }
+
+    if (ch === '(') {
+      tokens.push({ type: 'LPAREN', value: '(', position: i });
+      i += 1;
+      continue;
+    }
+
+    if (ch === ')') {
+      tokens.push({ type: 'RPAREN', value: ')', position: i });
+      i += 1;
       continue;
     }
 

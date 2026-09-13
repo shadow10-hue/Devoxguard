@@ -1,0 +1,7 @@
+# Keep the gate on real correctness/security issues; the example vars file and
+# any Galaxy-installed collections aren't ours to lint.
+exclude_paths:
+  - collections/
+  - group_vars/all.example.yml
+skip_list:
+  - yaml[line-length]
