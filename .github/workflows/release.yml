@@ -88,12 +88,12 @@ jobs:
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
       - run: cosign sign --yes ${{ env.API_IMAGE }}@${{ steps.push-api.outputs.digest }}
       - run: cosign sign --yes ${{ env.DASH_IMAGE }}@${{ steps.push-dash.outputs.digest }}
-      - uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ${{ env.API_IMAGE }}
           subject-digest: ${{ steps.push-api.outputs.digest }}
           push-to-registry: true
-      - uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ${{ env.DASH_IMAGE }}
           subject-digest: ${{ steps.push-dash.outputs.digest }}
